@@ -94,3 +94,6 @@ venv/
 
 # Gemini CLI
 .gemini/
+
+# Cursor
+.cursor/
