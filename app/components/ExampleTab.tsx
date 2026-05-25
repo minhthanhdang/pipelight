@@ -1,10 +1,12 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import {
   ReactFlow,
   Controls,
   type NodeTypes,
   type EdgeTypes,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -13,6 +15,7 @@ import PostgresNode from "./nodes/PostgresNode";
 import SheetsNode from "./nodes/SheetsNode";
 import GCSNode from "./nodes/GCSNode";
 import ShimmerEdge from "./edges/ShimmerEdge";
+import ConnectorPanel from "./ConnectorPanel";
 import { nodes, edges } from "@/lib/flowConfig";
 
 const nodeTypes: NodeTypes = {
@@ -27,13 +30,26 @@ const edgeTypes: EdgeTypes = {
 };
 
 export default function ExampleTab() {
+  const [selectedConnector, setSelectedConnector] = useState<string | null>(null);
+
+  const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
+    if (node.id === "bigquery") return;
+    setSelectedConnector(node.data.connectorId as string);
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedConnector(null);
+  }, []);
+
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         fitView
         nodesDraggable
         proOptions={{ hideAttribution: true }}
@@ -55,6 +71,10 @@ export default function ExampleTab() {
           </defs>
         </svg>
       </ReactFlow>
+      <ConnectorPanel
+        selectedNode={selectedConnector}
+        onClose={() => setSelectedConnector(null)}
+      />
     </div>
   );
 }

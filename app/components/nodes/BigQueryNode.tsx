@@ -1,10 +1,11 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import NodeCard from "../shared/NodeCard";
 
 export default function BigQueryNode({ data }: NodeProps) {
   return (
-    <div className="rounded-xl border-2 border-blue-500 bg-white px-8 py-6 shadow-lg min-w-[200px] text-center">
+    <NodeCard borderColor="border-blue-500" size="large">
       <Handle id="top" type="target" position={Position.Top} className="!bg-blue-500" />
       <Handle id="left" type="target" position={Position.Left} className="!bg-blue-500" />
       <Handle id="bottom" type="target" position={Position.Bottom} className="!bg-blue-500" />
@@ -24,6 +25,6 @@ export default function BigQueryNode({ data }: NodeProps) {
         </div>
       </div>
       <div className="text-xs text-gray-400 mt-1">glade_several</div>
-    </div>
+    </NodeCard>
   );
 }

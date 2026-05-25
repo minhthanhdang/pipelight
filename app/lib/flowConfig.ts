@@ -11,19 +11,19 @@ export const nodes: Node[] = [
     id: "postgres",
     type: "postgres",
     position: { x: 100, y: 80 },
-    data: { label: "Cloud SQL (Postgres)" },
+    data: { label: "Cloud SQL (Postgres)", connectorId: "postgres" },
   },
   {
     id: "sheets",
     type: "sheets",
     position: { x: 700, y: 80 },
-    data: { label: "Google Sheets" },
+    data: { label: "Google Sheets", connectorId: "sheets" },
   },
   {
     id: "gcs",
     type: "gcs",
     position: { x: 400, y: 550 },
-    data: { label: "GCS Bucket" },
+    data: { label: "GCS Bucket", connectorId: "gcs" },
   },
 ];
 
