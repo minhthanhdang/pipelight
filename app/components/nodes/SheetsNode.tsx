@@ -15,10 +15,8 @@ const icon = (
 );
 
 export default createSourceNode({
-  borderColor: "border-green-400",
-  textColor: "text-green-600",
+  glowClass: "node-glow-green",
   handleColor: "!bg-green-400",
-  subtitle: "pharmacy_ops",
   icon,
   handlePosition: Position.Bottom,
 });

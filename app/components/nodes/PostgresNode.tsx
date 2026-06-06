@@ -11,10 +11,8 @@ const icon = (
 );
 
 export default createSourceNode({
-  borderColor: "border-indigo-400",
-  textColor: "text-indigo-600",
+  glowClass: "node-glow-indigo",
   handleColor: "!bg-indigo-400",
-  subtitle: "patient_records",
   icon,
   handlePosition: Position.Bottom,
 });

@@ -15,10 +15,8 @@ const icon = (
 );
 
 export default createSourceNode({
-  borderColor: "border-amber-400",
-  textColor: "text-amber-600",
+  glowClass: "node-glow-amber",
   handleColor: "!bg-amber-400",
-  subtitle: "lab_results",
   icon,
   handlePosition: Position.Top,
 });

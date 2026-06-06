@@ -98,5 +98,6 @@ venv/
 # Cursor
 .cursor/
 
+# Data
 *.zip
 data/

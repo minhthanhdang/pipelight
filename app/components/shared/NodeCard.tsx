@@ -1,21 +1,23 @@
 "use client";
 
 interface NodeCardProps {
-  borderColor: string;
+  glowClass?: string;
+  selected?: boolean;
   size?: "default" | "large";
   children: React.ReactNode;
 }
 
 export default function NodeCard({
-  borderColor,
+  glowClass,
+  selected = false,
   size = "default",
   children,
 }: NodeCardProps) {
   return (
     <div
-      className={`rounded-xl border-2 bg-white shadow-md text-center ${borderColor} ${
-        size === "large" ? "px-8 py-6 shadow-lg min-w-[200px]" : "px-6 py-4 min-w-[180px]"
-      }`}
+      className={`rounded-xl bg-node-card shadow-md text-center transition-shadow ${glowClass ?? ""} ${
+        selected ? "ring-2 ring-blue-400/60" : ""
+      } ${size === "large" ? "p-5 shadow-lg" : "p-4"}`}
     >
       {children}
     </div>

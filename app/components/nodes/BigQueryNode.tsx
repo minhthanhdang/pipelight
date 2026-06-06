@@ -3,13 +3,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import NodeCard from "../shared/NodeCard";
 
-export default function BigQueryNode({ data }: NodeProps) {
+export default function BigQueryNode({ selected }: NodeProps) {
   return (
-    <NodeCard borderColor="border-blue-500" size="large">
+    <NodeCard glowClass="node-glow-blue" selected={selected} size="large">
       <Handle id="top" type="target" position={Position.Top} className="!bg-blue-500" />
       <Handle id="left" type="target" position={Position.Left} className="!bg-blue-500" />
       <Handle id="bottom" type="target" position={Position.Bottom} className="!bg-blue-500" />
-      <div className="flex items-center justify-center gap-3">
+      <div className="flex items-center justify-center">
         <svg width="32" height="32" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
           <path d="M14.5 53.5l-3-26L32 13l20.5 14.5-3 26L32 61z" fill="#4386FA"/>
           <path d="M44.5 36.5a12.5 12.5 0 10-18.7 10.8L24 53.5h16l-1.8-6.2a12.4 12.4 0 006.3-10.8z" fill="#4386FA"/>
@@ -20,11 +20,7 @@ export default function BigQueryNode({ data }: NodeProps) {
           <rect x="4" y="27" width="10" height="4" rx="2" fill="#4386FA"/>
           <rect x="50" y="27" width="10" height="4" rx="2" fill="#4386FA"/>
         </svg>
-        <div className="text-lg font-bold text-blue-600">
-          {data.label as string}
-        </div>
       </div>
-      <div className="text-xs text-gray-400 mt-1">glade_several</div>
     </NodeCard>
   );
 }
