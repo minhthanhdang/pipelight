@@ -34,7 +34,7 @@ export default function SignupPage() {
   return (
     <>
       <h2 className="text-2xl font-bold mb-1">Create an Account</h2>
-      <p className="text-gray-500 mb-6">Get started with SyncGuard</p>
+      <p className="text-muted-foreground mb-6">Get started with SyncGuard</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -47,7 +47,7 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black"
+            className="w-full rounded-lg border border-input px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
         <div>
@@ -61,7 +61,7 @@ export default function SignupPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black"
+            className="w-full rounded-lg border border-input px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
 
@@ -70,17 +70,17 @@ export default function SignupPage() {
           Send me product updates and tips
         </label>
 
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        {error && <p className="text-destructive text-sm">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-black text-white rounded-lg py-2.5 font-medium hover:bg-gray-800 disabled:opacity-50"
+          className="w-full bg-primary text-primary-foreground rounded-lg py-2.5 font-medium hover:bg-primary/90 disabled:opacity-50"
         >
           {loading ? "Creating account..." : "Sign up"}
         </button>
 
-        <p className="text-xs text-gray-500 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           By signing up, you agree to our{" "}
           <a href="#" className="underline">
             Terms of Service
@@ -95,16 +95,16 @@ export default function SignupPage() {
 
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300" />
+          <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-2 text-gray-500">or</span>
+          <span className="bg-background px-2 text-muted-foreground">or</span>
         </div>
       </div>
 
       <button
         onClick={() => signIn("google", { callbackUrl: "/" })}
-        className="w-full border border-gray-300 rounded-lg py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-gray-50"
+        className="w-full border border-input rounded-lg py-2.5 font-medium flex items-center justify-center gap-2 hover:bg-accent"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path
@@ -127,9 +127,9 @@ export default function SignupPage() {
         Continue with Google
       </button>
 
-      <p className="text-sm text-center mt-6 text-gray-600">
+      <p className="text-sm text-center mt-6 text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-black hover:underline">
+        <Link href="/login" className="font-medium text-foreground hover:underline">
           Log in
         </Link>
       </p>

@@ -1,18 +1,12 @@
 import { type NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth-middleware";
+import { FIVETRAN_BASE, getUserAuthHeader } from "@/lib/fivetran";
 
-const FIVETRAN_BASE = "https://api.fivetran.com/v1";
-
-function getAuthHeader() {
-  const key = process.env.FIVETRAN_API_KEY;
-  const secret = process.env.FIVETRAN_API_SECRET;
-  return "Basic " + Buffer.from(`${key}:${secret}`).toString("base64");
-}
-
-async function patchConnector(id: string, body: Record<string, unknown>) {
+async function patchConnector(id: string, body: Record<string, unknown>, authHeader: string) {
   const res = await fetch(`${FIVETRAN_BASE}/connectors/${id}`, {
     method: "PATCH",
     headers: {
-      Authorization: getAuthHeader(),
+      Authorization: authHeader,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -24,10 +18,18 @@ async function patchConnector(id: string, body: Record<string, unknown>) {
   return res.json();
 }
 
-export async function POST(
+export const POST = withAuth(async (
+  session,
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  let authHeader: string;
+  try {
+    authHeader = await getUserAuthHeader(session.user.id);
+  } catch {
+    return Response.json({ error: "Fivetran API keys not configured" }, { status: 403 });
+  }
+
   const { id } = await params;
   const { action } = await req.json();
 
@@ -36,15 +38,15 @@ export async function POST(
       case "rotate_password": {
         await patchConnector(id, {
           config: { password: "INVALID_PASSWORD_DEMO_BREAK" },
-        });
+        }, authHeader);
         return Response.json({ success: true, action, message: "Password rotated to invalid value" });
       }
       case "allow_schema": {
-        await patchConnector(id, { schema_change_handling: "ALLOW_ALL" });
+        await patchConnector(id, { schema_change_handling: "ALLOW_ALL" }, authHeader);
         return Response.json({ success: true, action, message: "Schema change handling set to ALLOW_ALL" });
       }
       case "block_schema": {
-        await patchConnector(id, { schema_change_handling: "BLOCK_ALL" });
+        await patchConnector(id, { schema_change_handling: "BLOCK_ALL" }, authHeader);
         return Response.json({ success: true, action, message: "Schema change handling set to BLOCK_ALL" });
       }
       default:
@@ -54,4 +56,4 @@ export async function POST(
     const msg = e instanceof Error ? e.message : "Unknown error";
     return Response.json({ error: msg }, { status: 500 });
   }
-}
+});

@@ -8,16 +8,23 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
+  id                String      @id @default(cuid())
+  name              String?
+  email             String      @unique
+  emailVerified     DateTime?
+  image             String?
+  password          String?
+  fivetranApiKey    String?     @map("fivetran_api_key")
+  fivetranApiSecret String?     @map("fivetran_api_secret")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  accounts          Account[]
+  sessions          Session[]
+  chatSessions      ChatSession[]
+  connectors        Connector[]
+  syncEvents        SyncEvent[]
+  incidents         Incident[]
+  aiActions         AIAction[]
 }
 
 model Account {
@@ -54,4 +61,105 @@ model VerificationToken {
   expires    DateTime
 
   @@id([identifier, token])
+}
+
+model ChatSession {
+  id           String        @id @default(cuid())
+  userId       String        @map("user_id")
+  adkSessionId String        @map("adk_session_id")
+  title        String        @default("New chat")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     ChatMessage[]
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String      @map("session_id")
+  role      String
+  content   String
+  createdAt DateTime    @default(now()) @map("created_at")
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model Connector {
+  id                   String    @default(cuid())
+  fivetranId           String    @map("fivetran_id")
+  service              String
+  paused               Boolean   @default(false)
+  syncFrequency        Int       @map("sync_frequency")
+  schemaChangeHandling String    @map("schema_change_handling")
+  setupState           String    @map("setup_state")
+  syncState            String    @map("sync_state")
+  succeededAt          DateTime? @map("succeeded_at")
+  failedAt             DateTime? @map("failed_at")
+  lastSyncedFromApi    DateTime  @default(now()) @map("last_synced_from_api")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  userId               String    @map("user_id")
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([id])
+  @@unique([fivetranId, userId])
+  @@map("connectors")
+}
+
+model SyncEvent {
+  id           String    @id @default(cuid())
+  connectorId  String    @map("connector_id")
+  fivetranId   String    @map("fivetran_id")
+  status       String
+  startedAt    DateTime  @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  rowsSynced   Int?      @map("rows_synced")
+  errorMessage String?   @map("error_message")
+  userId       String    @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, startedAt])
+  @@index([fivetranId, startedAt])
+  @@map("sync_events")
+}
+
+model Incident {
+  id           String    @id @default(cuid())
+  connectorId  String?   @map("connector_id")
+  fivetranId   String?   @map("fivetran_id")
+  type         String
+  severity     String
+  title        String
+  description  String
+  detectedAt   DateTime  @default(now()) @map("detected_at")
+  resolvedAt   DateTime? @map("resolved_at")
+  resolvedBy   String?   @map("resolved_by")
+  userId       String    @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, detectedAt])
+  @@index([severity])
+  @@map("incidents")
+}
+
+model AIAction {
+  id           String   @id @default(cuid())
+  connectorId  String?  @map("connector_id")
+  fivetranId   String?  @map("fivetran_id")
+  action       String
+  toolName     String   @map("tool_name")
+  input        String?
+  output       String?
+  approved     Boolean  @default(true)
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("ai_actions")
 }

@@ -1,0 +1,91 @@
+import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
+
+export async function POST(req: Request) {
+  const secret = process.env.FIVETRAN_WEBHOOK_SECRET;
+  if (!secret) {
+    return Response.json({ error: "Webhook not configured" }, { status: 500 });
+  }
+
+  const signature = req.headers.get("X-Fivetran-Signature-256");
+  if (!signature) {
+    return Response.json({ error: "Missing signature" }, { status: 401 });
+  }
+
+  const rawBody = await req.text();
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    return Response.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  const payload = JSON.parse(rawBody);
+
+  if (payload.event !== "sync_end") {
+    return Response.json({ ok: true, skipped: true });
+  }
+
+  const fivetranId = payload.connector_id as string;
+  const connector = await prisma.connector.findFirst({
+    where: { fivetranId },
+  });
+
+  if (!connector) {
+    return Response.json({ error: "Connector not found" }, { status: 404 });
+  }
+
+  const status = payload.data?.status === "SUCCESSFUL" ? "success" : "failure";
+  const errorMessage =
+    status === "failure" ? (payload.data?.message ?? "Sync failed") : null;
+
+  await prisma.syncEvent.create({
+    data: {
+      connectorId: connector.id,
+      fivetranId,
+      status,
+      startedAt: new Date(payload.data?.started_at ?? new Date()),
+      completedAt: new Date(payload.data?.completed_at ?? new Date()),
+      rowsSynced: payload.data?.rows_synced ?? null,
+      errorMessage,
+      userId: connector.userId,
+    },
+  });
+
+  const updateData: Record<string, unknown> = {
+    syncState: status === "success" ? "synced" : "sync_failed",
+  };
+  if (status === "success") {
+    updateData.succeededAt = new Date();
+  } else {
+    updateData.failedAt = new Date();
+  }
+
+  await prisma.connector.update({
+    where: { id: connector.id },
+    data: updateData,
+  });
+
+  if (status === "failure") {
+    const existing = await prisma.incident.findFirst({
+      where: { fivetranId, userId: connector.userId, resolvedAt: null },
+    });
+    if (!existing) {
+      await prisma.incident.create({
+        data: {
+          connectorId: connector.id,
+          fivetranId,
+          type: "data_quality",
+          severity: "critical",
+          title: `Sync failed: ${connector.service} (${fivetranId})`,
+          description: errorMessage ?? "Sync failed",
+          userId: connector.userId,
+        },
+      });
+    }
+  }
+
+  return Response.json({ ok: true });
+}

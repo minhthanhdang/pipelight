@@ -1,27 +1,29 @@
 import { type NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth-middleware";
+import { FIVETRAN_BASE, getUserAuthHeader } from "@/lib/fivetran";
 
-const FIVETRAN_BASE = "https://api.fivetran.com/v1";
-
-function getAuthHeader() {
-  const key = process.env.FIVETRAN_API_KEY;
-  const secret = process.env.FIVETRAN_API_SECRET;
-  return "Basic " + Buffer.from(`${key}:${secret}`).toString("base64");
-}
-
-export async function GET(
+export const GET = withAuth(async (
+  session,
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  let authHeader: string;
+  try {
+    authHeader = await getUserAuthHeader(session.user.id);
+  } catch {
+    return Response.json({ error: "Fivetran API keys not configured" }, { status: 403 });
+  }
+
   const { id } = await params;
 
   const res = await fetch(`${FIVETRAN_BASE}/connectors/${id}`, {
-    headers: { Authorization: getAuthHeader() },
+    headers: { Authorization: authHeader },
   });
 
   if (!res.ok) {
     return Response.json(
       { error: `Fivetran API error: ${res.status}` },
-      { status: res.status }
+      { status: res.status },
     );
   }
 
@@ -39,19 +41,27 @@ export async function GET(
     failed_at: c.failed_at,
     service: c.service,
   });
-}
+});
 
-export async function PATCH(
+export const PATCH = withAuth(async (
+  session,
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  let authHeader: string;
+  try {
+    authHeader = await getUserAuthHeader(session.user.id);
+  } catch {
+    return Response.json({ error: "Fivetran API keys not configured" }, { status: 403 });
+  }
+
   const { id } = await params;
   const body = await req.json();
 
   const res = await fetch(`${FIVETRAN_BASE}/connectors/${id}`, {
     method: "PATCH",
     headers: {
-      Authorization: getAuthHeader(),
+      Authorization: authHeader,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -61,10 +71,10 @@ export async function PATCH(
     const text = await res.text();
     return Response.json(
       { error: `Fivetran API error: ${res.status}`, details: text },
-      { status: res.status }
+      { status: res.status },
     );
   }
 
   const json = await res.json();
   return Response.json(json.data);
-}
+});
