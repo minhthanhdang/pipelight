@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import type { SyncEventItem, SyncHistoryResponse } from "@/lib/dashboard-types";
+import { AuditChart } from "@/components/sync-history/AuditChart";
 
 interface ConnectorOption {
   id: string;
@@ -91,20 +92,13 @@ export default function SyncHistoryClient({
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Sync History</h1>
+        <h1 className="text-2xl font-bold">Sync Auditor</h1>
         <p className="text-muted-foreground">Past sync runs and their outcomes</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Coming soon</p>
-            </CardContent>
-          </Card>
+          <AuditChart />
           <Card>
             <CardHeader>
               <CardTitle>Alerts</CardTitle>

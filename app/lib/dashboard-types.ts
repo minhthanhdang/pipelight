@@ -56,9 +56,28 @@ export interface SyncEventItem {
   rowsSynced: number | null;
   errorMessage: string | null;
   connectorService: string;
+  audit?: SyncAuditResult;
 }
 
 export interface SyncHistoryResponse {
   events: SyncEventItem[];
   nextCursor: string | null;
+}
+
+export interface AuditBucket { label: string; rate: number; total: number }
+export interface AuditChartResponse { buckets: AuditBucket[] }
+
+export interface AuditSuggestion {
+  action: string;
+  toolName: string;
+  params: Record<string, unknown>;
+}
+
+export interface SyncAuditResult {
+  id: string;
+  judgement: string;
+  directCause: string;
+  analysis: string;
+  suggestions: AuditSuggestion[];
+  createdAt: string;
 }

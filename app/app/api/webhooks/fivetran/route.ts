@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { triggerSyncAudit } from "@/lib/audit-trigger";
 import crypto from "crypto";
 
 export async function POST(req: Request) {
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
   const errorMessage =
     status === "failure" ? (payload.data?.message ?? "Sync failed") : null;
 
-  await prisma.syncEvent.create({
+  const syncEvent = await prisma.syncEvent.create({
     data: {
       connectorId: connector.id,
       fivetranId,
@@ -86,6 +87,14 @@ export async function POST(req: Request) {
       });
     }
   }
+
+  triggerSyncAudit({
+    syncEventId: syncEvent.id,
+    connectorId: connector.id,
+    fivetranId,
+    userId: connector.userId,
+    webhookPayload: payload,
+  }).catch((err) => console.error("[audit]", err));
 
   return Response.json({ ok: true });
 }

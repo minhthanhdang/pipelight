@@ -27,7 +27,7 @@ const navItems = [
   { label: "Connectors", icon: Plug, href: "/connectors" },
   { label: "Data Quality", icon: ShieldCheck, href: "/data-quality" },
   { label: "Agent", icon: Bot, href: "/agent" },
-  { label: "Sync History", icon: Clock, href: "/sync-history" },
+  { label: "Syncs", icon: Clock, href: "/sync-history" },
   { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
