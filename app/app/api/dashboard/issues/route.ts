@@ -2,21 +2,24 @@ import { withAuth } from "@/lib/auth-middleware";
 import { prisma } from "@/lib/prisma";
 
 export const GET = withAuth(async (session) => {
-  const incidents = await prisma.incident.findMany({
-    where: { userId: session.user.id, resolvedAt: null },
-    orderBy: { detectedAt: "desc" },
+  const audits = await prisma.syncAudit.findMany({
+    where: {
+      userId: session.user.id,
+      judgement: { in: ["warning", "failure"] },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 10,
   });
 
   return Response.json(
-    incidents.map((i) => ({
-      id: i.id,
-      connectorId: i.connectorId,
-      fivetranId: i.fivetranId,
-      type: i.type,
-      severity: i.severity,
-      title: i.title,
-      description: i.description,
-      detectedAt: i.detectedAt.toISOString(),
-    }))
+    audits.map((a) => ({
+      id: a.id,
+      syncEventId: a.syncEventId,
+      fivetranId: a.fivetranId,
+      judgement: a.judgement,
+      directCause: a.directCause,
+      analysis: a.analysis,
+      createdAt: a.createdAt.toISOString(),
+    })),
   );
 });

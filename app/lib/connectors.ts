@@ -58,6 +58,15 @@ export const CONNECTOR_MAP: Record<string, ConnectorMapping> = {
   },
 };
 
+export function getConnectorMeta(fivetranId: string) {
+  for (const mapping of Object.values(CONNECTOR_MAP)) {
+    if (mapping.connectorIds.includes(fivetranId as never)) {
+      return { label: mapping.label, sourceType: mapping.type };
+    }
+  }
+  return { label: fivetranId, sourceType: "unknown" };
+}
+
 export function getBreakActions(
   type: ConnectorMapping["type"]
 ): { action: BreakAction; label: string; color: string }[] {

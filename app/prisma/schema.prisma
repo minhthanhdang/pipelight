@@ -23,9 +23,10 @@ model User {
   chatSessions      ChatSession[]
   connectors        Connector[]
   syncEvents        SyncEvent[]
-  incidents         Incident[]
   aiActions         AIAction[]
   syncAudits        SyncAudit[]
+  syncSummaries     SyncSummary[]
+  agentConfig       AgentConfig?
 }
 
 model Account {
@@ -68,6 +69,7 @@ model ChatSession {
   id           String        @id @default(cuid())
   userId       String        @map("user_id")
   adkSessionId String        @map("adk_session_id")
+  agentType    String        @default("main") @map("agent_type")
   title        String        @default("New chat")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
@@ -99,6 +101,9 @@ model Connector {
   syncState            String    @map("sync_state")
   succeededAt          DateTime? @map("succeeded_at")
   failedAt             DateTime? @map("failed_at")
+  schemaPrefix         String?   @map("schema_prefix")
+  groupId              String?   @map("group_id")
+  destinationService   String?   @map("destination_service")
   lastSyncedFromApi    DateTime  @default(now()) @map("last_synced_from_api")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
@@ -115,40 +120,25 @@ model SyncEvent {
   connectorId  String    @map("connector_id")
   fivetranId   String    @map("fivetran_id")
   status       String
+  auditStatus  String    @default("pending") @map("audit_status")
   startedAt    DateTime  @map("started_at")
   completedAt  DateTime? @map("completed_at")
   rowsSynced   Int?      @map("rows_synced")
+  syncType     String?   @map("sync_type")
+  syncMetrics  Json?     @map("sync_metrics")
   errorMessage String?   @map("error_message")
+  snapshotData Json?     @map("snapshot_data")
   userId       String    @map("user_id")
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  audit        SyncAudit?
+  audits       SyncAudit[]
 
   @@index([userId, startedAt])
   @@index([fivetranId, startedAt])
   @@map("sync_events")
 }
 
-model Incident {
-  id           String    @id @default(cuid())
-  connectorId  String?   @map("connector_id")
-  fivetranId   String?   @map("fivetran_id")
-  type         String
-  severity     String
-  title        String
-  description  String
-  detectedAt   DateTime  @default(now()) @map("detected_at")
-  resolvedAt   DateTime? @map("resolved_at")
-  resolvedBy   String?   @map("resolved_by")
-  userId       String    @map("user_id")
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt    DateTime  @default(now()) @map("created_at")
-
-  @@index([userId, detectedAt])
-  @@index([severity])
-  @@map("incidents")
-}
 
 model AIAction {
   id           String   @id @default(cuid())
@@ -169,7 +159,7 @@ model AIAction {
 
 model SyncAudit {
   id          String    @id @default(cuid())
-  syncEventId String    @unique @map("sync_event_id")
+  syncEventId String    @map("sync_event_id")
   connectorId String    @map("connector_id")
   fivetranId  String    @map("fivetran_id")
   judgement    String
@@ -184,4 +174,37 @@ model SyncAudit {
   @@index([userId, createdAt])
   @@index([judgement])
   @@map("sync_audits")
+}
+
+model AgentConfig {
+  id                String   @id @default(cuid())
+  userId            String   @unique @map("user_id")
+  model             String   @default("gemini-2.5-flash")
+  temperature       Float?
+  topP              Float?
+  thinkingLevel     String?  @map("thinking_level")
+  customInstruction String?  @map("custom_instruction")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("agent_configs")
+}
+
+model SyncSummary {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  connectorId   String?  @map("connector_id")
+  fivetranId    String?  @map("fivetran_id")
+  periodStart   DateTime @map("period_start")
+  periodEnd     DateTime @map("period_end")
+  periodLabel   String   @map("period_label")
+  summary       String
+  stats         Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, connectorId, periodLabel])
+  @@map("sync_summaries")
 }

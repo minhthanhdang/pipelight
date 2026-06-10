@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { useAIStore } from "@/stores/useAIStore";
 
@@ -67,6 +68,20 @@ export function useChat() {
               continue;
             }
 
+            if (event.connectCardUri) {
+              window.open(event.connectCardUri, "_blank");
+              continue;
+            }
+
+            if (event.error || event.errorCode) {
+              const errMsg = event.error || event.errorMessage || `Agent error ${event.errorCode}`;
+              const isModelUnavailable = /503|high demand|unavailable|overloaded/i.test(errMsg);
+              const displayMsg = isModelUnavailable ? "Model isn't available right now — please try again later" : errMsg;
+              setMessages((prev) => [...prev, { id: nextId(), role: "agent", content: `⚠️ ${displayMsg}` }]);
+              toast.error(displayMsg);
+              return;
+            }
+
             const eventParts = event?.content?.parts;
             if (!eventParts) continue;
 
@@ -91,7 +106,13 @@ export function useChat() {
 
               if (part.functionCall) {
                 const name = part.functionCall.name;
-                const WRITE_TOOLS = ["modify_connector", "modify_schema_config", "trigger_sync", "resync_connector"];
+                const WRITE_TOOLS = [
+                  "modify_connector",
+                  "modify_schema_config",
+                  "trigger_sync",
+                  "resync_connector",
+                  "create_connect_card",
+                ];
                 if (WRITE_TOOLS.includes(name)) {
                   const tc: ToolCall = {
                     name,
@@ -124,14 +145,21 @@ export function useChat() {
       setIsStreaming(true);
 
       try {
+        const body: Record<string, unknown> = { message: text, sessionId };
         const res = await fetchWithAuth("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, sessionId }),
+          body: JSON.stringify(body),
         });
 
-        if (!res.ok) throw new Error(`Chat API error: ${res.status}`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? `Chat API error: ${res.status}`);
+        }
         await parseSSEStream(res);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Something went wrong";
+        toast.error(msg);
       } finally {
         setIsStreaming(false);
         fetchSessions();
@@ -152,10 +180,13 @@ export function useChat() {
         const confirmBody: Record<string, unknown> = {
           sessionId,
           toolCallId: toolCall.id,
+          toolName: toolCall.name,
           approved,
         };
 
-        if (approved && toolCall.args) {
+        if (approved && toolCall.name === "create_connect_card") {
+          confirmBody.connectorId = toolCall.args.connector_id;
+        } else if (approved && toolCall.args) {
           confirmBody.method = toolCall.args.method;
           confirmBody.url = toolCall.args.url;
           confirmBody.body = toolCall.args.body;
@@ -167,8 +198,14 @@ export function useChat() {
           body: JSON.stringify(confirmBody),
         });
 
-        if (!res.ok) throw new Error(`Confirm API error: ${res.status}`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? `Confirm API error: ${res.status}`);
+        }
         await parseSSEStream(res);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Something went wrong";
+        toast.error(msg);
       } finally {
         setIsStreaming(false);
       }
@@ -184,14 +221,16 @@ export function useChat() {
     setSessionId(sid);
   }, []);
 
-  const fetchSessions = useCallback(async () => {
+  const fetchSessions = useCallback(async (): Promise<ChatSessionSummary[]> => {
     setIsLoadingSessions(true);
     try {
       const res = await fetchWithAuth("/api/chat/sessions");
       if (res.ok) {
         const data = await res.json();
         setSessions(data);
+        return data;
       }
+      return [];
     } finally {
       setIsLoadingSessions(false);
     }

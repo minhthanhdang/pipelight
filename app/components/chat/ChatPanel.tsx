@@ -32,9 +32,17 @@ export default function ChatPanel({ open, onClose }: ChatPanelProps) {
   const setPendingPrompt = useAIStore((s) => s.setPendingPrompt);
   const handledPromptRef = useRef<string | null>(null);
 
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    if (open) fetchSessions();
-  }, [open, fetchSessions]);
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!open) return;
+    fetchSessions().then((list) => {
+      if (justOpened && list.length > 0 && !pendingPrompt) {
+        switchSession(list[0].id);
+      }
+    });
+  }, [open, fetchSessions, switchSession, pendingPrompt]);
 
   useEffect(() => {
     if (open && pendingPrompt && handledPromptRef.current !== pendingPrompt) {
@@ -86,6 +94,7 @@ export default function ChatPanel({ open, onClose }: ChatPanelProps) {
           <ChatInput onSend={sendMessage} disabled={isStreaming} />
         </>
       )}
+
     </div>
   );
 }

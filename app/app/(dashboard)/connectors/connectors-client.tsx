@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import { RefreshCw, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Table,
@@ -21,7 +19,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { timeAgo } from "@/lib/utils";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 interface ConnectorRow {
   id: string;
@@ -35,6 +32,21 @@ interface ConnectorRow {
   lastSyncedFromApi: string;
   label: string;
   sourceType: string;
+  schemaPrefix: string | null;
+  destinationService: string | null;
+}
+
+const DESTINATION_LABELS: Record<string, string> = {
+  big_query: "BigQuery",
+  snowflake: "Snowflake",
+  redshift: "Redshift",
+  databricks: "Databricks",
+  postgres: "Postgres",
+};
+
+function formatDestination(raw: string | null) {
+  if (!raw) return "—";
+  return DESTINATION_LABELS[raw] ?? raw.replace(/_/g, " ");
 }
 
 type SortKey = "label" | "service" | "status" | "succeededAt" | "schemaChangeHandling";
@@ -61,7 +73,7 @@ function StatusBadge({ connector }: { connector: ConnectorRow }) {
       return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Syncing</Badge>;
     case "scheduled":
     case "connected":
-      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Connected</Badge>;
+      return <Badge className="bg-success/15 text-success hover:bg-success/15">Connected</Badge>;
     default:
       return <Badge variant="outline">{status}</Badge>;
   }
@@ -71,7 +83,7 @@ function sortRows(rows: ConnectorRow[], key: SortKey, dir: SortDir) {
   return [...rows].sort((a, b) => {
     let av: string, bv: string;
     switch (key) {
-      case "label": av = a.label; bv = b.label; break;
+      case "label": av = a.schemaPrefix ?? a.label; bv = b.schemaPrefix ?? b.label; break;
       case "service": av = a.service; bv = b.service; break;
       case "status": av = getStatus(a); bv = getStatus(b); break;
       case "succeededAt": av = a.succeededAt ?? ""; bv = b.succeededAt ?? ""; break;
@@ -82,26 +94,44 @@ function sortRows(rows: ConnectorRow[], key: SortKey, dir: SortDir) {
   });
 }
 
+function SortButton({
+  column,
+  activeKey,
+  onToggle,
+  children,
+}: {
+  column: SortKey;
+  activeKey: SortKey;
+  onToggle: (key: SortKey) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={() => onToggle(column)}
+      className={`flex items-center gap-1 hover:text-foreground transition-colors ${activeKey === column ? "text-foreground" : ""}`}
+    >
+      {children}
+      <ArrowUpDown className="h-3 w-3" />
+    </button>
+  );
+}
+
 export default function ConnectorsClient({ connectors }: { connectors: ConnectorRow[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [syncing, setSyncing] = useState(false);
-  const [result, setResult] = useState<{ synced: number; failed: number; errors?: string[] } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("label");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  const loading = syncing || isPending;
+  const loading = refreshing || isPending;
 
-  async function handleSync() {
-    setSyncing(true);
-    setResult(null);
+  async function handleRefresh() {
+    setRefreshing(true);
     try {
-      const res = await fetchWithAuth("/api/connectors/sync", { method: "POST" });
-      const data = await res.json();
-      setResult({ synced: data.synced, failed: data.failed, errors: data.errors });
+      await fetchWithAuth("/api/connectors/sync", { method: "POST" });
       startTransition(() => router.refresh());
     } finally {
-      setSyncing(false);
+      setRefreshing(false);
     }
   }
 
@@ -122,62 +152,51 @@ export default function ConnectorsClient({ connectors }: { connectors: Connector
       )
     : null;
 
-  const SortButton = ({ column, children }: { column: SortKey; children: React.ReactNode }) => (
-    <button
-      onClick={() => toggleSort(column)}
-      className="flex items-center gap-1 hover:text-foreground transition-colors"
-    >
-      {children}
-      <ArrowUpDown className="h-3 w-3" />
-    </button>
-  );
-
   return (
     <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Connectors</h1>
+          <p className="mt-2 text-muted-foreground">
+            {lastSynced ? `Your Fivetran Connectors. Last refresh ${timeAgo(lastSynced)}` : "Your Fivetran Connectors"}
+          </p>
+        </div>
+        <Button onClick={handleRefresh} disabled={loading} size="sm">
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div>
-            <CardTitle className="text-2xl font-bold">Connectors</CardTitle>
-            <CardDescription>
-              {lastSynced ? `Last synced ${timeAgo(lastSynced)}` : "Not synced yet"}
-            </CardDescription>
-          </div>
-          <Button onClick={handleSync} disabled={loading} size="sm">
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            Sync All
-          </Button>
-        </CardHeader>
         <CardContent>
-          {result && (
-            <div className="mb-4 rounded-md bg-muted px-4 py-2 text-sm">
-              Synced {result.synced} connector{result.synced !== 1 && "s"}
-              {result.failed > 0 && `, ${result.failed} failed`}
-              {result.errors?.map((e, i) => (
-                <div key={i} className="text-destructive text-xs mt-1">{e}</div>
-              ))}
-            </div>
-          )}
-
           {connectors.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
-              No connectors synced yet. Click &quot;Sync All&quot; to fetch from Fivetran.
+              No connectors synced yet. Click &quot;Refresh&quot; to fetch from Fivetran.
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead><SortButton column="label">Name</SortButton></TableHead>
-                  <TableHead><SortButton column="service">Service</SortButton></TableHead>
-                  <TableHead><SortButton column="status">Status</SortButton></TableHead>
-                  <TableHead><SortButton column="succeededAt">Last Sync</SortButton></TableHead>
-                  <TableHead><SortButton column="schemaChangeHandling">Schema Handling</SortButton></TableHead>
+                  <TableHead><SortButton column="label" activeKey={sortKey} onToggle={toggleSort}>Name</SortButton></TableHead>
+                  <TableHead><SortButton column="service" activeKey={sortKey} onToggle={toggleSort}>Service</SortButton></TableHead>
+                  <TableHead>Destination</TableHead>
+                  <TableHead><SortButton column="status" activeKey={sortKey} onToggle={toggleSort}>Status</SortButton></TableHead>
+                  <TableHead><SortButton column="succeededAt" activeKey={sortKey} onToggle={toggleSort}>Last Sync</SortButton></TableHead>
+                  <TableHead><SortButton column="schemaChangeHandling" activeKey={sortKey} onToggle={toggleSort}>Schema Handling</SortButton></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sorted.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.label}</TableCell>
+                    <TableCell>
+                      <div>
+                        <span className="font-medium">{c.schemaPrefix ?? c.label}</span>
+                        {c.schemaPrefix && (
+                          <span className="block text-xs text-muted-foreground">{c.label}</span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{c.service}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatDestination(c.destinationService)}</TableCell>
                     <TableCell><StatusBadge connector={c} /></TableCell>
                     <TableCell className="text-muted-foreground">{timeAgo(c.succeededAt)}</TableCell>
                     <TableCell>

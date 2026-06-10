@@ -1,6 +1,19 @@
 import { withAuth } from "@/lib/auth-middleware";
 import { prisma } from "@/lib/prisma";
-import { createAdkSession, runSSE } from "@/lib/adk";
+import { createAdkSession, runSSEWithRetry, APP_NAME } from "@/lib/adk";
+import { DEFAULT_AGENT_CONFIG, type AgentConfig } from "@/lib/agent-config";
+
+async function getUserAgentConfig(userId: string): Promise<AgentConfig> {
+  const config = await prisma.agentConfig.findUnique({ where: { userId } });
+  if (!config) return DEFAULT_AGENT_CONFIG;
+  return {
+    model: config.model as AgentConfig["model"],
+    temperature: config.temperature ?? undefined,
+    topP: config.topP ?? undefined,
+    thinkingLevel: config.thinkingLevel as AgentConfig["thinkingLevel"],
+    customInstruction: config.customInstruction ?? undefined,
+  };
+}
 
 export const POST = withAuth(async (session, req: Request) => {
   const { message, sessionId: existingSessionId } = await req.json();
@@ -21,16 +34,27 @@ export const POST = withAuth(async (session, req: Request) => {
     },
   });
 
+  const agentConfig = await getUserAgentConfig(userId);
+
   let chatSessionId = existingSessionId;
   let adkSessionId: string;
 
   if (!chatSessionId) {
-    adkSessionId = await createAdkSession(userId);
+    try {
+      adkSessionId = await createAdkSession(userId, agentConfig);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      const isConnErr = /ECONNREFUSED|ECONNRESET|ETIMEDOUT|fetch failed|network/i.test(msg);
+      return Response.json(
+        { error: isConnErr ? "Model isn't available right now — please try again later" : msg || "Failed to create session" },
+        { status: 502 },
+      );
+    }
     const title = message.length > 50
       ? message.slice(0, 50).replace(/\s+\S*$/, '') + '...'
       : message;
     const chatSession = await prisma.chatSession.create({
-      data: { userId, adkSessionId, title },
+      data: { userId, adkSessionId, agentType: "main", title },
     });
     chatSessionId = chatSession.id;
   } else {
@@ -47,13 +71,23 @@ export const POST = withAuth(async (session, req: Request) => {
     data: { sessionId: chatSessionId, role: "user", content: message },
   });
 
-  const adkRes = await runSSE(userId, adkSessionId, {
-    role: "user",
-    parts: [{ text: message }],
-  });
+  let adkRes: Response;
+  try {
+    adkRes = await runSSEWithRetry(userId, adkSessionId, {
+      role: "user",
+      parts: [{ text: message }],
+    }, agentConfig);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "ADK request failed";
+    const isConnErr = /ECONNREFUSED|ECONNRESET|ETIMEDOUT|fetch failed|network/i.test(msg);
+    return Response.json(
+      { error: isConnErr ? "Model isn't available right now — please try again later" : msg },
+      { status: 502 },
+    );
+  }
 
-  if (!adkRes.ok || !adkRes.body) {
-    return Response.json({ error: "ADK request failed" }, { status: 502 });
+  if (!adkRes.body) {
+    return Response.json({ error: "ADK returned empty response" }, { status: 502 });
   }
 
   const reader = adkRes.body.getReader();
@@ -85,7 +119,10 @@ export const POST = withAuth(async (session, req: Request) => {
               if (parts) {
                 for (const part of parts) {
                   if (part.text) agentText += part.text;
-                  if (part.functionCall) toolCalls.push(JSON.stringify(part.functionCall));
+                  if (part.functionCall) {
+                    console.log(`[chat] tool call: ${part.functionCall.name}`, JSON.stringify(part.functionCall.args ?? {}).slice(0, 200));
+                    toolCalls.push(JSON.stringify(part.functionCall));
+                  }
                 }
               }
             } catch {
@@ -106,6 +143,11 @@ export const POST = withAuth(async (session, req: Request) => {
         }
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sessionId: chatSessionId })}\n\n`));
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : "Stream interrupted";
+        const isConnErr = /ECONNREFUSED|ECONNRESET|ETIMEDOUT|fetch failed|network/i.test(raw);
+        const msg = isConnErr ? "Model isn't available right now — please try again later" : raw;
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
       } finally {
         controller.close();
       }

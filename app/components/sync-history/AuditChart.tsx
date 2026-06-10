@@ -1,72 +1,172 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useState } from "react";
+import { PieChart, Pie, Cell } from "recharts";
+import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
-import type { AuditBucket, AuditChartResponse } from "@/lib/dashboard-types";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { ChartContainer, ChartTooltip, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
+import type { AuditDistribution, AuditDistributionResponse } from "@/lib/dashboard-types";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 const chartConfig = {
-  rate: { label: "Success Rate", color: "var(--success)" },
+  clean: { label: "Clean", color: "var(--chart-success)" },
+  warning: { label: "Warning", color: "var(--chart-3)" },
+  critical: { label: "Critical", color: "var(--chart-5)" },
 } satisfies ChartConfig;
 
-const PERIODS = [
-  { value: "week", label: "Weekly" },
-  { value: "month", label: "Monthly" },
-];
+const COLORS = [chartConfig.clean.color, chartConfig.warning.color, chartConfig.critical.color];
 
-export function AuditChart() {
-  const [period, setPeriod] = useState("week");
-  const [buckets, setBuckets] = useState<AuditBucket[]>([]);
-  const [loading, setLoading] = useState(true);
+function buildMonthOptions() {
+  const now = new Date();
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = subMonths(now, i);
+    return { value: format(d, "yyyy-MM"), label: format(d, "MMM yyyy") };
+  });
+}
 
-  useEffect(() => {
-    setLoading(true);
-    fetchWithAuth(`/api/sync-history/audits?period=${period}`)
-      .then((r) => r.json())
-      .then((data: AuditChartResponse) => setBuckets(data.buckets))
-      .finally(() => setLoading(false));
-  }, [period]);
+function RangeDatePicker({
+  range,
+  onSelect,
+}: {
+  range: DateRange | undefined;
+  onSelect: (r: DateRange | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const label = range?.from
+    ? range.to
+      ? `${format(range.from, "MMM d")} – ${format(range.to, "MMM d, yyyy")}`
+      : format(range.from, "MMM d, yyyy")
+    : "Pick date range";
 
   return (
-    <Card>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs font-normal">
+            <CalendarIcon className="size-3" />
+            {label}
+          </Button>
+        }
+      />
+      <PopoverContent align="start" className="w-auto p-0">
+        <Calendar
+          mode="range"
+          selected={range}
+          onSelect={onSelect}
+          numberOfMonths={2}
+          disabled={{ after: new Date() }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function AuditChart({ className, connectorId }: { className?: string; connectorId?: string }) {
+  const [mode, setMode] = useState<"month" | "custom">("month");
+  const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), "yyyy-MM"));
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [distribution, setDistribution] = useState<AuditDistribution | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const monthOptions = useMemo(buildMonthOptions, []);
+
+  const dateRange = useMemo(() => {
+    if (mode === "month") {
+      const [y, m] = selectedMonth.split("-").map(Number);
+      const base = new Date(y, m - 1, 1);
+      return { start: startOfMonth(base), end: endOfMonth(base) };
+    }
+    if (customRange?.from && customRange?.to) {
+      return { start: customRange.from, end: customRange.to };
+    }
+    return null;
+  }, [mode, selectedMonth, customRange]);
+
+  useEffect(() => {
+    if (!dateRange) {
+      setDistribution(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const params = new URLSearchParams({
+      start: dateRange.start.toISOString(),
+      end: dateRange.end.toISOString(),
+      ...(connectorId && { connectorId }),
+    });
+    fetchWithAuth(`/api/sync-history/audits?${params}`)
+      .then((r) => r.json())
+      .then((data: AuditDistributionResponse) => setDistribution(data.distribution))
+      .finally(() => setLoading(false));
+  }, [dateRange, connectorId]);
+
+  const pieData = distribution
+    ? [
+        { name: "clean", value: distribution.clean },
+        { name: "warning", value: distribution.warning },
+        { name: "critical", value: distribution.critical },
+      ].filter((d) => d.value > 0)
+    : [];
+
+  return (
+    <Card className={className}>
       <CardHeader>
-        <CardTitle>Audits</CardTitle>
+        <CardTitle>Sync Audits</CardTitle>
         <CardAction>
-          <Select value={period} onValueChange={(v) => v && setPeriod(v)}>
-            <SelectTrigger size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIODS.map((p) => (
-                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={mode} onValueChange={(v) => v && setMode(v as "month" | "custom")}>
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">By Month</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            {mode === "month" ? (
+              <Select value={selectedMonth} onValueChange={(v) => v && setSelectedMonth(v)}>
+                <SelectTrigger size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <RangeDatePicker range={customRange} onSelect={setCustomRange} />
+            )}
+          </div>
         </CardAction>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="flex h-48 items-center justify-center text-muted-foreground">Loading…</div>
-        ) : buckets.length > 0 ? (
-          <ChartContainer config={chartConfig} className="h-48 w-full">
-            <LineChart data={buckets} accessibilityLayer>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} />
-              <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
+        ) : mode === "custom" && !dateRange ? (
+          <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Select start and end dates</div>
+        ) : pieData.length > 0 ? (
+          <ChartContainer config={chartConfig} className="mx-auto h-48 w-full">
+            <PieChart accessibilityLayer>
               <ChartTooltip
-                formatter={(value, _name, item) => [
-                  `${value}% (${item.payload.total} syncs)`,
-                  "Success Rate",
-                ]}
+                formatter={(value, name) => [`${value}`, chartConfig[name as keyof typeof chartConfig]?.label ?? name]}
               />
-              <Line type="monotone" dataKey="rate" stroke="var(--color-rate)" strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
+              <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={40} outerRadius={70} paddingAngle={2}>
+                {pieData.map((entry) => (
+                  <Cell key={entry.name} fill={chartConfig[entry.name as keyof typeof chartConfig].color} />
+                ))}
+              </Pie>
+              <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+            </PieChart>
           </ChartContainer>
         ) : (
-          <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">No audit data yet</div>
+          <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">No audit data for this period</div>
         )}
       </CardContent>
     </Card>

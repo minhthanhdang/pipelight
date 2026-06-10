@@ -18,10 +18,14 @@ function parseConnectorSummary(c: any) {
   return {
     id: c.id,
     service: c.service,
+    schema: c.schema,
     paused: c.paused,
     sync_frequency: c.sync_frequency,
     setup_state: c.status?.setup_state,
     sync_state: c.status?.sync_state,
+    update_state: c.status?.update_state,
+    tasks: c.status?.tasks ?? [],
+    warnings: c.status?.warnings ?? [],
     succeeded_at: c.succeeded_at,
     failed_at: c.failed_at,
   };
@@ -31,13 +35,21 @@ function parseConnectorDetails(c: any) {
   return {
     id: c.id,
     service: c.service,
+    schema: c.schema,
     paused: c.paused,
     sync_frequency: c.sync_frequency,
-    schema_change_handling: c.schema_change_handling,
+    schedule_type: c.schedule_type,
     setup_state: c.status?.setup_state,
+    schema_status: c.status?.schema_status,
     sync_state: c.status?.sync_state,
+    update_state: c.status?.update_state,
+    is_historical_sync: c.status?.is_historical_sync,
+    tasks: c.status?.tasks ?? [],
+    warnings: c.status?.warnings ?? [],
     succeeded_at: c.succeeded_at,
     failed_at: c.failed_at,
+    config: c.config,
+    source_sync_details: c.source_sync_details,
   };
 }
 
@@ -155,11 +167,78 @@ const reloadSchema = new FunctionTool({
   }),
 });
 
+const getColumnConfig = new FunctionTool({
+  name: "get_column_config",
+  description:
+    "Get column-level config for a specific table — names, enabled state, hashing. Essential for detecting schema drift (renamed/added/blocked columns)",
+  parameters: z.object({
+    connector_id: z.string().describe("Fivetran connector ID"),
+    schema_name: z.string().describe("Schema name, e.g. 'pharmacy_ops'"),
+    table_name: z.string().describe("Table name, e.g. 'medications_q4'"),
+  }),
+  execute: wrapExecute(
+    async (
+      {
+        connector_id,
+        schema_name,
+        table_name,
+      }: { connector_id: string; schema_name: string; table_name: string },
+      context?: Context,
+    ) => {
+      const creds = getCredsFromContext(context);
+      const data = (await fivetranFetch(
+        `/connectors/${connector_id}/schemas/${schema_name}/tables/${table_name}/columns`,
+        {},
+        creds,
+      )) as any;
+      return {
+        columns: Object.entries(data.columns ?? {}).map(
+          ([name, col]: [string, any]) => ({
+            name,
+            enabled: col.enabled,
+            hashed: col.hashed,
+            name_in_destination: col.name_in_destination,
+          }),
+        ),
+      };
+    },
+  ),
+});
+
+const getDestinationDetails = new FunctionTool({
+  name: "get_destination_details",
+  description:
+    "Get destination (data warehouse) details — service type, region, setup state, config",
+  parameters: z.object({
+    destination_id: z.string().describe("Fivetran destination ID"),
+  }),
+  execute: wrapExecute(async ({ destination_id }: { destination_id: string }, context?: Context) => {
+    const creds = getCredsFromContext(context);
+    return fivetranFetch(`/destinations/${destination_id}`, {}, creds);
+  }),
+});
+
+const getGroupDetails = new FunctionTool({
+  name: "get_group_details",
+  description:
+    "Get group details — name, created_at, and associated destination",
+  parameters: z.object({
+    group_id: z.string().describe("Fivetran group ID"),
+  }),
+  execute: wrapExecute(async ({ group_id }: { group_id: string }, context?: Context) => {
+    const creds = getCredsFromContext(context);
+    return fivetranFetch(`/groups/${group_id}`, {}, creds);
+  }),
+});
+
 export const readTools = [
   listConnectors,
   getConnectorDetails,
   getConnectorSchema,
+  getColumnConfig,
   getConnectorState,
   testConnectorSetup,
   reloadSchema,
+  getDestinationDetails,
+  getGroupDetails,
 ];

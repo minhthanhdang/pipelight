@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { triggerSyncAudit } from "@/lib/audit-trigger";
+import { fetchLatestSyncDetails, getUserAuthHeader } from "@/lib/fivetran";
 import crypto from "crypto";
 
 export async function POST(req: Request) {
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
       status,
       startedAt: new Date(payload.data?.started_at ?? new Date()),
       completedAt: new Date(payload.data?.completed_at ?? new Date()),
-      rowsSynced: payload.data?.rows_synced ?? null,
+      rowsSynced: null,
       errorMessage,
       userId: connector.userId,
     },
@@ -69,24 +70,22 @@ export async function POST(req: Request) {
     data: updateData,
   });
 
-  if (status === "failure") {
-    const existing = await prisma.incident.findFirst({
-      where: { fivetranId, userId: connector.userId, resolvedAt: null },
-    });
-    if (!existing) {
-      await prisma.incident.create({
-        data: {
-          connectorId: connector.id,
-          fivetranId,
-          type: "data_quality",
-          severity: "critical",
-          title: `Sync failed: ${connector.service} (${fivetranId})`,
-          description: errorMessage ?? "Sync failed",
-          userId: connector.userId,
-        },
-      });
-    }
-  }
+  getUserAuthHeader(connector.userId)
+    .then((auth) => fetchLatestSyncDetails(fivetranId, auth))
+    .then((details) => {
+      if (details) {
+        return prisma.syncEvent.update({
+          where: { id: syncEvent.id },
+          data: {
+            rowsSynced: details.rowsSynced,
+            syncType: details.syncType,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            syncMetrics: (details.syncMetrics ?? undefined) as any,
+          },
+        });
+      }
+    })
+    .catch((err) => console.error("[sync details backfill]", err));
 
   triggerSyncAudit({
     syncEventId: syncEvent.id,

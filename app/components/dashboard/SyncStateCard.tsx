@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
@@ -9,8 +9,7 @@ import type { SyncStatsResponse } from "@/lib/dashboard-types";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 const chartConfig = {
-  success: { label: "Success", color: "var(--success)" },
-  failure: { label: "Failure", color: "var(--destructive)" },
+  rate: { label: "Success Rate", color: "var(--accent-green-bright)" },
 } satisfies ChartConfig;
 
 const PERIODS = [
@@ -32,9 +31,13 @@ export function SyncStateCard() {
   }, [period]);
 
   const successRate = data && data.total > 0 ? Math.round((data.successes / data.total) * 100) : 0;
+  const dailyRates = data?.daily.map((d) => {
+    const total = d.success + d.failure;
+    return { date: d.date, rate: total > 0 ? Math.round((d.success / total) * 100) : 0 };
+  }) ?? [];
 
   return (
-    <Card>
+    <Card className="lg:col-span-3">
       <CardHeader>
         <CardTitle>Sync State</CardTitle>
         <CardAction>
@@ -60,16 +63,24 @@ export function SyncStateCard() {
               <div><span className="text-2xl font-bold text-success">{successRate}%</span> <span className="text-muted-foreground">success</span></div>
               <div><span className="text-2xl font-bold text-destructive">{data.failures}</span> <span className="text-muted-foreground">failures</span></div>
             </div>
-            {data.daily.length > 0 ? (
+            {dailyRates.length > 0 ? (
               <ChartContainer config={chartConfig} className="h-48 w-full">
-                <BarChart data={data.daily} accessibilityLayer>
+                <LineChart data={dailyRates} accessibilityLayer>
+                  <defs>
+                    <filter id="glowLine" x="-50%" y="-50%" width="200%" height="200%">
+                      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" })} tickLine={false} axisLine={false} />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="success" stackId="a" fill="var(--color-success)" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="failure" stackId="a" fill="var(--color-destructive)" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
+                  <ChartTooltip formatter={(value) => [`${value}%`, "Success Rate"]} />
+                  <Line type="monotone" dataKey="rate" stroke="var(--color-rate)" strokeWidth={2} dot={{ r: 3 }} filter="url(#glowLine)" />
+                </LineChart>
               </ChartContainer>
             ) : (
               <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">No sync data yet</div>

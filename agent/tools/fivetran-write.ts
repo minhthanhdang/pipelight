@@ -120,9 +120,26 @@ const resyncConnector = new LongRunningFunctionTool({
   },
 });
 
+const createConnectCard = new LongRunningFunctionTool({
+  name: "create_connect_card",
+  description:
+    "Launch a Connect Card so the user can re-authorize a connector via OAuth in-app. Requires user confirmation",
+  parameters: z.object({
+    connector_id: z.string().describe("Fivetran connector ID"),
+  }),
+  execute: async (input) => {
+    return {
+      action: "Re-authorize connector via Connect Card",
+      connector_id: input.connector_id,
+      toolName: "create_connect_card",
+    };
+  },
+});
+
 export const writeTools = [
   modifyConnector,
   modifySchemaConfig,
   triggerSync,
   resyncConnector,
+  createConnectCard,
 ];

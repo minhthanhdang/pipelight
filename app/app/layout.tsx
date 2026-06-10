@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Hanken_Grotesk, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
+import QueryProvider from "@/components/providers/QueryProvider";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const hankenGrotesk = Hanken_Grotesk({
@@ -29,7 +31,12 @@ export default function RootLayout({
       className={`${hankenGrotesk.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <QueryProvider>
+            {children}
+          </QueryProvider>
+          <Toaster richColors position="bottom-left" />
+        </AuthProvider>
       </body>
     </html>
   );

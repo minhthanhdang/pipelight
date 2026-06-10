@@ -35,6 +35,8 @@ export default async function ConnectorsPage() {
       lastSyncedFromApi: c.lastSyncedFromApi.toISOString(),
       label: meta.label,
       sourceType: meta.sourceType,
+      schemaPrefix: c.schemaPrefix ?? null,
+      destinationService: c.destinationService ?? null,
     };
   });
 

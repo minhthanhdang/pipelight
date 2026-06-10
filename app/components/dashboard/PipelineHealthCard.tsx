@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { AlertTriangle, AlertCircle, ShieldCheck } from "lucide-react";
-import type { HealthResponse } from "@/lib/dashboard-types";
+import { AlertTriangle, AlertCircle, ShieldCheck, XCircle } from "lucide-react";
+import type { HealthResponse, HealthIncidentItem } from "@/lib/dashboard-types";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 const PERIODS = [
@@ -19,10 +19,10 @@ function scoreColor(score: number) {
   return "text-destructive";
 }
 
-function severityBadge(severity: string) {
-  if (severity === "critical")
-    return <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"><AlertCircle className="h-3 w-3" />Critical</span>;
-  return <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"><AlertTriangle className="h-3 w-3" />Warning</span>;
+function incidentBadge(item: HealthIncidentItem) {
+  if (item.kind === "sync_failure")
+    return <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"><XCircle className="h-3 w-3" />Sync</span>;
+  return <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"><AlertCircle className="h-3 w-3" />Audit</span>;
 }
 
 export function PipelineHealthCard() {
@@ -39,9 +39,9 @@ export function PipelineHealthCard() {
   }, [period]);
 
   return (
-    <Card>
+    <Card className="lg:col-span-4">
       <CardHeader>
-        <CardTitle>Pipeline Health</CardTitle>
+        <CardTitle>Data Health</CardTitle>
         <CardAction>
           <Select value={period} onValueChange={(v) => v && setPeriod(v)}>
             <SelectTrigger size="sm">
@@ -66,34 +66,37 @@ export function PipelineHealthCard() {
             </div>
             <div className="flex gap-6 text-sm">
               <div className="flex items-center gap-1.5">
+                <XCircle className="h-4 w-4 text-destructive" />
+                <span>{data.syncFailureCount} sync failures</span>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <AlertCircle className="h-4 w-4 text-destructive" />
-                <span>{data.incidentCount} critical</span>
+                <span>{data.auditCriticalCount} critical</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <AlertTriangle className="h-4 w-4 text-warning" />
-                <span>{data.warningCount} warnings</span>
+                <span>{data.auditWarningCount} warnings</span>
               </div>
             </div>
-            {data.recentIncidents.length > 0 && (
+            {data.recentIncidents.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recent Incidents</p>
                 <ul className="space-y-1.5">
-                  {data.recentIncidents.map((inc) => (
-                    <li key={inc.id} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        {severityBadge(inc.severity)}
-                        <span>{inc.title}</span>
+                  {data.recentIncidents.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {incidentBadge(item)}
+                        <span className="truncate">{item.label}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">{new Date(inc.detectedAt).toLocaleDateString()}</span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">{new Date(item.timestamp).toLocaleDateString()}</span>
                     </li>
                   ))}
                 </ul>
               </div>
-            )}
-            {data.recentIncidents.length === 0 && (
+            ) : (
               <div className="flex items-center gap-2 text-sm text-success">
                 <ShieldCheck className="h-4 w-4" />
-                No incidents in this period
+                No critical incidents detected
               </div>
             )}
           </div>

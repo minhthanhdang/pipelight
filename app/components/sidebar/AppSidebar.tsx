@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Plug,
-  ShieldCheck,
   Bot,
   Clock,
+  FileText,
   Settings,
   LogOut,
   PanelLeftClose,
@@ -24,10 +24,10 @@ import { useSidebar } from "./SidebarContext";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/" },
+  { label: "Auditor", icon: Clock, href: "/sync-history" },
+  { label: "Summaries", icon: FileText, href: "/summaries" },
   { label: "Connectors", icon: Plug, href: "/connectors" },
-  { label: "Data Quality", icon: ShieldCheck, href: "/data-quality" },
-  { label: "Agent", icon: Bot, href: "/agent" },
-  { label: "Syncs", icon: Clock, href: "/sync-history" },
+  { label: "Agent Config", icon: Bot, href: "/agent" },
   { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
@@ -42,7 +42,7 @@ export function AppSidebar() {
         expanded ? "w-[var(--sidebar-width)]" : "w-[var(--sidebar-width-collapsed)]"
       )}
     >
-      <nav className="flex flex-1 items-start justify-center p-3 pt-[24px]">
+      <nav className={cn("flex flex-1 items-start p-3 pt-[24px]", expanded ? "justify-center" : "pl-[40px]")}>
         <div className="inline-flex flex-col gap-1">
         {navItems.map((item) => {
           const active = item.href === "/"
@@ -62,7 +62,12 @@ export function AppSidebar() {
               <Tooltip key={item.href}>
                 <TooltipTrigger
                   render={<Link href={item.href} />}
-                  className={cn(linkClasses, "flex items-center justify-center")}
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+                    active
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                 </TooltipTrigger>
@@ -83,13 +88,13 @@ export function AppSidebar() {
         </div>
       </nav>
 
-      <div className="flex justify-center p-3">
+      <div className={cn("flex p-3", expanded ? "justify-center" : "pl-[40px]")}>
         <div className="inline-flex flex-col gap-1">
         {!expanded ? (
           <Tooltip>
             <TooltipTrigger
               render={<button onClick={toggleSidebar} />}
-              className="flex w-full items-center justify-center rounded-md px-0 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
             >
               <PanelLeft className="h-4 w-4 shrink-0" />
             </TooltipTrigger>
@@ -111,7 +116,7 @@ export function AppSidebar() {
           <Tooltip>
             <TooltipTrigger
               render={<button onClick={() => signOut({ redirectTo: "/login" })} />}
-              className="flex w-full items-center justify-center rounded-md px-0 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
             >
               <LogOut className="h-4 w-4 shrink-0" />
             </TooltipTrigger>

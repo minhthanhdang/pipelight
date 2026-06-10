@@ -35,7 +35,7 @@ export function AIActionsCard() {
   }, [cursor, loadingMore]);
 
   return (
-    <Card>
+    <Card className="lg:col-span-6">
       <CardHeader>
         <CardTitle>AI Actions</CardTitle>
       </CardHeader>

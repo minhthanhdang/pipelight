@@ -1,6 +1,6 @@
 import { withAuth } from "@/lib/auth-middleware";
 import { prisma } from "@/lib/prisma";
-import type { HealthResponse } from "@/lib/dashboard-types";
+import type { HealthResponse, HealthIncidentItem } from "@/lib/dashboard-types";
 
 function getPeriodStart(period: string): Date {
   const now = new Date();
@@ -18,34 +18,58 @@ export const GET = withAuth(async (session, req: Request) => {
   const { searchParams } = new URL(req.url);
   const period = searchParams.get("period") ?? "week";
   const since = getPeriodStart(period);
+  const userId = session.user.id;
 
-  const incidents = await prisma.incident.findMany({
-    where: { userId: session.user.id, detectedAt: { gte: since } },
-    orderBy: { detectedAt: "desc" },
-  });
+  const [audits, failedSyncs] = await Promise.all([
+    prisma.syncAudit.findMany({
+      where: { userId, createdAt: { gte: since } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.syncEvent.findMany({
+      where: { userId, status: "failure", startedAt: { gte: since } },
+      orderBy: { startedAt: "desc" },
+    }),
+  ]);
 
-  const criticals = incidents.filter((i) => i.severity === "critical").length;
-  const warnings = incidents.filter((i) => i.severity === "warning").length;
+  const auditCriticals = audits.filter((a) => a.judgement === "failure").length;
+  const auditWarnings = audits.filter((a) => a.judgement === "warning").length;
+  const syncFailures = failedSyncs.length;
 
-  const byType: Record<string, number> = {};
-  for (const i of incidents) {
-    byType[i.type] = (byType[i.type] ?? 0) + 1;
+  const score = Math.max(
+    0,
+    Math.min(100, 100 - syncFailures * 15 - auditCriticals * 15 - auditWarnings * 5),
+  );
+
+  const incidents: HealthIncidentItem[] = [];
+
+  for (const a of audits.filter((a) => a.judgement === "failure")) {
+    incidents.push({
+      id: a.id,
+      fivetranId: a.fivetranId,
+      kind: "audit_failure",
+      label: a.directCause,
+      timestamp: a.createdAt.toISOString(),
+    });
   }
 
-  const score = Math.max(0, Math.min(100, 100 - criticals * 15 - warnings * 5));
+  for (const s of failedSyncs) {
+    incidents.push({
+      id: s.id,
+      fivetranId: s.fivetranId,
+      kind: "sync_failure",
+      label: s.errorMessage ?? "Sync failed",
+      timestamp: s.startedAt.toISOString(),
+    });
+  }
+
+  incidents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const result: HealthResponse = {
     score,
-    incidentCount: criticals,
-    warningCount: warnings,
-    byType,
-    recentIncidents: incidents.slice(0, 5).map((i) => ({
-      id: i.id,
-      type: i.type,
-      severity: i.severity,
-      title: i.title,
-      detectedAt: i.detectedAt.toISOString(),
-    })),
+    syncFailureCount: syncFailures,
+    auditWarningCount: auditWarnings,
+    auditCriticalCount: auditCriticals,
+    recentIncidents: incidents.slice(0, 5),
   };
 
   return Response.json(result);
