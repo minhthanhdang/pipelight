@@ -6,6 +6,7 @@ import {
   fetchLatestSyncDetails,
   getUserAuthHeader,
 } from "@/lib/fivetran";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const POST = withAuth(async (
@@ -99,7 +100,7 @@ export const POST = withAuth(async (
       completedAt: succeededAt ?? failedAt ?? new Date(),
       rowsSynced: details?.rowsSynced ?? null,
       syncType: details?.syncType ?? null,
-      syncMetrics: details?.syncMetrics ?? undefined,
+      syncMetrics: (details?.syncMetrics as Prisma.InputJsonValue) ?? undefined,
       errorMessage: status === "failure" ? `setup_state: ${setupState}, sync_state: ${syncState}` : null,
       userId,
     },

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getUserAuthHeader, FIVETRAN_BASE } from "@/lib/fivetran";
 import { createAuditSession, runAudit } from "@/lib/adk";
@@ -91,7 +92,7 @@ export async function triggerSyncAudit({
 
     await prisma.syncEvent.update({
       where: { id: syncEventId },
-      data: { snapshotData: snapshot, auditStatus: "running" },
+      data: { snapshotData: snapshot as unknown as Prisma.InputJsonValue, auditStatus: "running" },
     });
 
     const prompt = JSON.stringify({
