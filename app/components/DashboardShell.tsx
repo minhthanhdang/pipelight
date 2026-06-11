@@ -25,8 +25,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <div className="relative mx-auto flex h-screen max-h-[1080px] w-full max-w-[1400px] flex-col overflow-x-clip px-16 pt-12">
         <div className="relative z-10 flex h-14 items-center shrink-0 pr-6">
           <div className="flex items-center gap-0 pl-[42px]">
-            <img src="/logo-256.png" alt="Pipelight" width={40} height={40} className="rounded-lg shrink-0" />
-            <img src="/logo-title.png" alt="Pipelight" height={108} className="h-[108px] w-auto" />
+            <img src="https://storage.googleapis.com/pipelight-assets/logo-256.png" alt="Pipelight" width={40} height={40} className="rounded-lg shrink-0" />
+            <img src="https://storage.googleapis.com/pipelight-assets/logo-title.png" alt="Pipelight" height={108} className="h-[108px] w-auto" />
           </div>
           <button
             onClick={() => setChatOpen(true)}
