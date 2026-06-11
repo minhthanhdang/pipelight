@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useFivetranSettings, useSaveFivetranKeys, useRemoveFivetranKeys } from "@/hooks/queries";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
 
@@ -19,8 +21,11 @@ export default function SettingsPage() {
   const hasKeys = settings?.hasKeys ?? false;
   const maskedKey = settings?.maskedApiKey ?? null;
 
+  const connectorSync = saveMutation.data?.connectorSync;
   const status = saveMutation.isSuccess
-    ? "Credentials saved successfully."
+    ? connectorSync && typeof connectorSync.upserted === "number"
+      ? `Credentials saved. ${connectorSync.upserted} connector${connectorSync.upserted === 1 ? "" : "s"} loaded.`
+      : "Credentials saved successfully."
     : removeMutation.isSuccess
       ? "Credentials removed."
       : saveMutation.error?.message ?? removeMutation.error?.message ?? null;
@@ -30,6 +35,7 @@ export default function SettingsPage() {
     await saveMutation.mutateAsync({ apiKey, apiSecret });
     setApiKey("");
     setApiSecret("");
+    router.refresh();
   }
 
   return (

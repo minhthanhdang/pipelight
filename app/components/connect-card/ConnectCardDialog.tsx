@@ -11,9 +11,10 @@ import {
 interface ConnectCardDialogProps {
   uri: string | null;
   onClose: () => void;
+  onCancel?: () => void;
 }
 
-export default function ConnectCardDialog({ uri, onClose }: ConnectCardDialogProps) {
+export default function ConnectCardDialog({ uri, onClose, onCancel }: ConnectCardDialogProps) {
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       if (event.data?.type === "fivetran:connect-card:close") {
@@ -29,7 +30,7 @@ export default function ConnectCardDialog({ uri, onClose }: ConnectCardDialogPro
   }, [handleMessage]);
 
   return (
-    <Dialog open={!!uri} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={!!uri} onOpenChange={(open) => { if (!open) (onCancel ?? onClose)(); }}>
       <DialogContent className="sm:max-w-2xl h-[80vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle>Re-authorize Connector</DialogTitle>

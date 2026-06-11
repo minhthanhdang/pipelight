@@ -65,13 +65,16 @@ function RangeDatePicker({
 }
 
 export function AuditChart({ className, connectorId }: { className?: string; connectorId?: string }) {
-  const [mode, setMode] = useState<"month" | "custom">("month");
+  const [mode, setMode] = useState<"all" | "month" | "custom">("all");
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
 
   const monthOptions = useMemo(buildMonthOptions, []);
 
   const queryParams = useMemo(() => {
+    if (mode === "all") {
+      return { connectorId };
+    }
     if (mode === "month") {
       const [y, m] = selectedMonth.split("-").map(Number);
       const base = new Date(y, m - 1, 1);
@@ -100,11 +103,12 @@ export function AuditChart({ className, connectorId }: { className?: string; con
         <CardTitle>Sync Audits</CardTitle>
         <CardAction>
           <div className="flex items-center gap-2">
-            <Select value={mode} onValueChange={(v) => v && setMode(v as "month" | "custom")}>
+            <Select value={mode} onValueChange={(v) => v && setMode(v as "all" | "month" | "custom")}>
               <SelectTrigger size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">Show All</SelectItem>
                 <SelectItem value="month">By Month</SelectItem>
                 <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
@@ -120,9 +124,9 @@ export function AuditChart({ className, connectorId }: { className?: string; con
                   ))}
                 </SelectContent>
               </Select>
-            ) : (
+            ) : mode === "custom" ? (
               <RangeDatePicker range={customRange} onSelect={setCustomRange} />
-            )}
+            ) : null}
           </div>
         </CardAction>
       </CardHeader>

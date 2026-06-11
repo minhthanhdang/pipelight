@@ -31,6 +31,12 @@ export function useChat() {
   const isStreaming = useAIStore((s) => s.isStreaming);
   const setIsStreaming = useAIStore((s) => s.setIsStreaming);
   const [pendingToolCall, setPendingToolCall] = useState<ToolCall | null>(null);
+  const [connectCardUri, setConnectCardUri] = useState<string | null>(null);
+  const [pendingReauth, setPendingReauth] = useState<{
+    toolCallId: string;
+    toolName: string;
+  } | null>(null);
+  const [reauthError, setReauthError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const msgIdCounter = useRef(0);
@@ -68,16 +74,20 @@ export function useChat() {
               continue;
             }
 
-            if (event.connectCardUri) {
-              window.open(event.connectCardUri, "_blank");
-              continue;
-            }
-
             if (event.error || event.errorCode) {
-              const errMsg = event.error || event.errorMessage || `Agent error ${event.errorCode}`;
-              const isModelUnavailable = /503|high demand|unavailable|overloaded/i.test(errMsg);
-              const displayMsg = isModelUnavailable ? "Model isn't available right now — please try again later" : errMsg;
-              setMessages((prev) => [...prev, { id: nextId(), role: "agent", content: `⚠️ ${displayMsg}` }]);
+              const errMsg =
+                event.error ||
+                event.errorMessage ||
+                `Agent error ${event.errorCode}`;
+              const isModelUnavailable =
+                /503|high demand|unavailable|overloaded/i.test(errMsg);
+              const displayMsg = isModelUnavailable
+                ? "Model isn't available right now — please try again later"
+                : errMsg;
+              setMessages((prev) => [
+                ...prev,
+                { id: nextId(), role: "agent", content: `⚠️ ${displayMsg}` },
+              ]);
               toast.error(displayMsg);
               return;
             }
@@ -98,8 +108,8 @@ export function useChat() {
                     prev.map((m) =>
                       m.id === agentMsgId
                         ? { ...m, content: m.content + part.text }
-                        : m
-                    )
+                        : m,
+                    ),
                   );
                 }
               }
@@ -111,7 +121,7 @@ export function useChat() {
                   "modify_schema_config",
                   "trigger_sync",
                   "resync_connector",
-                  "create_connect_card",
+                  "open_reauth_dialog",
                 ];
                 if (WRITE_TOOLS.includes(name)) {
                   const tc: ToolCall = {
@@ -126,6 +136,20 @@ export function useChat() {
                   };
                   setMessages((prev) => [...prev, toolMsg]);
                   setPendingToolCall(tc);
+
+                  if (name === "open_reauth_dialog" && tc.args.connector_id) {
+                    fetchWithAuth("/api/connectors/connect-card", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ connectorId: tc.args.connector_id }),
+                    })
+                      .then((r) => r.json())
+                      .then((d) => { if (d.connectCardUri) setConnectCardUri(d.connectCardUri); })
+                      .catch(() => {});
+                  }
+
+                  reader.cancel();
+                  return;
                 }
               }
             }
@@ -135,12 +159,16 @@ export function useChat() {
         }
       }
     },
-    [sessionId]
+    [sessionId],
   );
 
   const sendMessage = useCallback(
     async (text: string) => {
-      const userMsg: ChatMessage = { id: nextId(), role: "user", content: text };
+      const userMsg: ChatMessage = {
+        id: nextId(),
+        role: "user",
+        content: text,
+      };
       setMessages((prev) => [...prev, userMsg]);
       setIsStreaming(true);
 
@@ -165,7 +193,7 @@ export function useChat() {
         fetchSessions();
       }
     },
-    [sessionId, parseSSEStream]
+    [sessionId, parseSSEStream],
   );
 
   const confirmTool = useCallback(
@@ -177,6 +205,8 @@ export function useChat() {
       setIsStreaming(true);
 
       try {
+        const isReauth = approved && toolCall.name === "open_reauth_dialog";
+
         const confirmBody: Record<string, unknown> = {
           sessionId,
           toolCallId: toolCall.id,
@@ -184,7 +214,7 @@ export function useChat() {
           approved,
         };
 
-        if (approved && toolCall.name === "create_connect_card") {
+        if (isReauth) {
           confirmBody.connectorId = toolCall.args.connector_id;
         } else if (approved && toolCall.args) {
           confirmBody.method = toolCall.args.method;
@@ -202,6 +232,16 @@ export function useChat() {
           const data = await res.json().catch(() => null);
           throw new Error(data?.error ?? `Confirm API error: ${res.status}`);
         }
+
+        const contentType = res.headers.get("Content-Type") ?? "";
+        if (isReauth && contentType.includes("application/json")) {
+          const data = await res.json();
+          setPendingReauth({ toolCallId: data.toolCallId, toolName: toolCall.name });
+          setConnectCardUri(null);
+          setIsStreaming(false);
+          return;
+        }
+
         await parseSSEStream(res);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Something went wrong";
@@ -210,7 +250,45 @@ export function useChat() {
         setIsStreaming(false);
       }
     },
-    [pendingToolCall, sessionId, parseSSEStream]
+    [pendingToolCall, sessionId, parseSSEStream],
+  );
+
+  const completeReauth = useCallback(
+    async (completed: boolean) => {
+      if (!pendingReauth || !sessionId) return;
+
+      const { toolCallId, toolName } = pendingReauth;
+      setReauthError(null);
+      setIsStreaming(true);
+
+      try {
+        const res = await fetchWithAuth("/api/chat/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phase: "complete_connect_card",
+            sessionId,
+            toolCallId,
+            toolName,
+            completed,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? `Confirm API error: ${res.status}`);
+        }
+        await parseSSEStream(res);
+        setPendingReauth(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Something went wrong";
+        setReauthError(msg);
+        toast.error(msg);
+      } finally {
+        setIsStreaming(false);
+      }
+    },
+    [pendingReauth, sessionId, parseSSEStream],
   );
 
   const loadHistory = useCallback(async (sid: string) => {
@@ -240,7 +318,7 @@ export function useChat() {
     async (sid: string) => {
       await loadHistory(sid);
     },
-    [loadHistory]
+    [loadHistory],
   );
 
   const startNewSession = useCallback(() => {
@@ -254,10 +332,14 @@ export function useChat() {
     sessionId,
     isStreaming,
     pendingToolCall,
+    connectCardUri,
+    pendingReauth,
+    reauthError,
     sessions,
     isLoadingSessions,
     sendMessage,
     confirmTool,
+    completeReauth,
     loadHistory,
     fetchSessions,
     switchSession,

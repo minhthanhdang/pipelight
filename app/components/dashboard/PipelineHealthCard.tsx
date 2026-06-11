@@ -13,11 +13,6 @@ const PERIODS = [
   { value: "quarter", label: "90 days" },
 ];
 
-function scoreColor(score: number) {
-  if (score >= 80) return "text-success";
-  if (score >= 50) return "text-warning";
-  return "text-destructive";
-}
 
 function incidentBadge(item: HealthIncidentItem) {
   if (item.kind === "sync_failure")
@@ -51,10 +46,7 @@ export function PipelineHealthCard() {
           <div className="flex h-32 items-center justify-center text-muted-foreground">Loading…</div>
         ) : data ? (
           <div className="space-y-4">
-            <div className="flex items-baseline gap-4">
-              <span className={`text-5xl font-bold ${scoreColor(data.score)}`}>{data.score}</span>
-              <span className="text-sm text-muted-foreground">/ 100</span>
-            </div>
+
             <div className="flex gap-6 text-sm">
               <div className="flex items-center gap-1.5">
                 <XCircle className="h-4 w-4 text-destructive" />

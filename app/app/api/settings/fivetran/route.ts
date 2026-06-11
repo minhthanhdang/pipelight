@@ -2,6 +2,7 @@ import { withAuth } from "@/lib/auth-middleware";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { FIVETRAN_BASE } from "@/lib/fivetran";
+import { syncConnectorsForUser, type ConnectorSyncResult } from "@/lib/connector-sync";
 
 export const GET = withAuth(async (session) => {
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
@@ -47,7 +48,16 @@ export const POST = withAuth(async (session, req: Request) => {
     },
   });
 
-  return Response.json({ success: true, maskedApiKey: "****" + apiKey.slice(-4) });
+  // Auto-load connectors with the freshly saved keys; save succeeds even if this fails
+  let connectorSync: ConnectorSyncResult | { error: string };
+  try {
+    connectorSync = await syncConnectorsForUser(session.user.id);
+  } catch (err) {
+    console.error("Auto connector sync after key save failed:", err);
+    connectorSync = { error: err instanceof Error ? err.message : "Connector sync failed" };
+  }
+
+  return Response.json({ success: true, maskedApiKey: "****" + apiKey.slice(-4), connectorSync });
 });
 
 export const DELETE = withAuth(async (session) => {

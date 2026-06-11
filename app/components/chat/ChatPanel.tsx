@@ -19,9 +19,13 @@ export default function ChatPanel({ open, onClose }: ChatPanelProps) {
     sessionId,
     isStreaming,
     pendingToolCall,
+    connectCardUri,
     sessions,
     sendMessage,
     confirmTool,
+    completeReauth,
+    pendingReauth,
+    reauthError,
     fetchSessions,
     switchSession,
     startNewSession,
@@ -90,6 +94,10 @@ export default function ChatPanel({ open, onClose }: ChatPanelProps) {
             pendingToolCall={pendingToolCall}
             isStreaming={isStreaming}
             onConfirm={confirmTool}
+            connectCardUri={connectCardUri}
+            pendingReauth={!!pendingReauth}
+            onCompleteReauth={completeReauth}
+            reauthError={reauthError}
           />
           <ChatInput onSend={sendMessage} disabled={isStreaming} />
         </>

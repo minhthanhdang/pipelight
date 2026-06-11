@@ -10,6 +10,10 @@ interface ChatMessageListProps {
   pendingToolCall: ToolCall | null;
   isStreaming: boolean;
   onConfirm: (approved: boolean) => void;
+  connectCardUri?: string | null;
+  pendingReauth?: boolean;
+  onCompleteReauth?: (completed: boolean) => void;
+  reauthError?: string | null;
 }
 
 export default function ChatMessageList({
@@ -17,6 +21,10 @@ export default function ChatMessageList({
   pendingToolCall,
   isStreaming,
   onConfirm,
+  connectCardUri,
+  pendingReauth,
+  onCompleteReauth,
+  reauthError,
 }: ChatMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +56,10 @@ export default function ChatMessageList({
           }
           isStreaming={isStreaming}
           onConfirm={onConfirm}
+          connectCardUri={connectCardUri}
+          pendingReauth={pendingReauth}
+          onCompleteReauth={onCompleteReauth}
+          reauthError={reauthError}
         />
       ))}
       {isStreaming && messages.length > 0 && messages[messages.length - 1]?.role === "user" && (

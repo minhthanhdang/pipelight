@@ -3,11 +3,13 @@ import { fetchJson, fetchWithAuth, ApiError } from "@/lib/fetchWithAuth";
 import { queryKeys } from "./queryKeys";
 import type { AuditDistributionResponse, SyncAuditResult, SyncHistoryResponse } from "@/lib/dashboard-types";
 
-export function useAuditDistribution(params: { start: string; end: string; connectorId?: string } | null) {
+export function useAuditDistribution(params: { start?: string; end?: string; connectorId?: string } | null) {
   return useQuery({
-    queryKey: params ? queryKeys.syncHistory.auditDistribution(params.start, params.end, params.connectorId) : ["audit-distribution-disabled"],
+    queryKey: params ? queryKeys.syncHistory.auditDistribution(params.start ?? "all", params.end ?? "all", params.connectorId) : ["audit-distribution-disabled"],
     queryFn: () => {
-      const sp = new URLSearchParams({ start: params!.start, end: params!.end });
+      const sp = new URLSearchParams();
+      if (params!.start) sp.set("start", params!.start);
+      if (params!.end) sp.set("end", params!.end);
       if (params!.connectorId) sp.set("connectorId", params!.connectorId);
       return fetchJson<AuditDistributionResponse>(`/api/sync-history/audits?${sp}`);
     },

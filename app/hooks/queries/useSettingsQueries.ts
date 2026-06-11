@@ -12,8 +12,19 @@ interface SaveKeysPayload {
   apiSecret: string;
 }
 
+interface ConnectorSyncSummary {
+  upserted?: number;
+  deleted?: number;
+  failed?: number;
+  errors?: string[];
+  backfilledConnectors?: number;
+  backfilledEvents?: number;
+  error?: string;
+}
+
 interface SaveKeysResponse {
   maskedApiKey?: string | null;
+  connectorSync?: ConnectorSyncSummary;
 }
 
 export function useFivetranSettings() {

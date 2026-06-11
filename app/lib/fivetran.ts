@@ -77,18 +77,31 @@ export async function fetchConnectorFromFivetran(id: string, authHeader: string)
   return data;
 }
 
+export interface FivetranSyncHistoryItem {
+  status?: string;
+  started_at?: string;
+  completed_at?: string | null;
+  is_historical_sync?: boolean;
+  stages?: { extract?: { volume?: number } };
+  [key: string]: unknown;
+}
+
+export async function fetchSyncHistory(connectorId: string, authHeader: string, limit = 30): Promise<FivetranSyncHistoryItem[]> {
+  const res = await fetch(
+    `${FIVETRAN_BASE}/connectors/${connectorId}/sync-history?limit=${limit}`,
+    { headers: { Authorization: authHeader } },
+  );
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data?.items ?? [];
+}
+
 export async function fetchLatestSyncDetails(connectorId: string, authHeader: string): Promise<{
   rowsSynced: number | null;
   syncType: string | null;
   syncMetrics: Record<string, unknown> | null;
 } | null> {
-  const res = await fetch(
-    `${FIVETRAN_BASE}/connectors/${connectorId}/sync-history?limit=1`,
-    { headers: { Authorization: authHeader } },
-  );
-  if (!res.ok) return null;
-  const json = await res.json();
-  const entry = json.data?.items?.[0];
+  const [entry] = await fetchSyncHistory(connectorId, authHeader, 1);
   if (!entry) return null;
 
   const extractVolume = entry.stages?.extract?.volume;

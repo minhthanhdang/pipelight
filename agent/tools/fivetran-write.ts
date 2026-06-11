@@ -120,18 +120,18 @@ const resyncConnector = new LongRunningFunctionTool({
   },
 });
 
-const createConnectCard = new LongRunningFunctionTool({
-  name: "create_connect_card",
+const openReauthDialog = new LongRunningFunctionTool({
+  name: "open_reauth_dialog",
   description:
-    "Launch a Connect Card so the user can re-authorize a connector via OAuth in-app. Requires user confirmation",
+    "Open an in-app Fivetran Connect Card dialog so the user can re-authorize a broken connector without leaving the chat. Requires user confirmation",
   parameters: z.object({
     connector_id: z.string().describe("Fivetran connector ID"),
   }),
   execute: async (input) => {
     return {
-      action: "Re-authorize connector via Connect Card",
+      action: "Open Fivetran re-authorization dialog",
       connector_id: input.connector_id,
-      toolName: "create_connect_card",
+      toolName: "open_reauth_dialog",
     };
   },
 });
@@ -141,5 +141,5 @@ export const writeTools = [
   modifySchemaConfig,
   triggerSync,
   resyncConnector,
-  createConnectCard,
+  openReauthDialog,
 ];

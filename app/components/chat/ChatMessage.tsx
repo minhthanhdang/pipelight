@@ -1,16 +1,20 @@
 "use client";
 
 import type { ChatMessage as ChatMessageType, ToolCall } from "@/hooks/useChat";
-import ToolConfirmCard from "./ToolConfirmCard";
+import { TOOL_CARD_MAP } from "./tool-cards";
 
 interface ChatMessageProps {
   message: ChatMessageType;
   isPendingTool: boolean;
   isStreaming: boolean;
   onConfirm: (approved: boolean) => void;
+  connectCardUri?: string | null;
+  pendingReauth?: boolean;
+  onCompleteReauth?: (completed: boolean) => void;
+  reauthError?: string | null;
 }
 
-export default function ChatMessage({ message, isPendingTool, isStreaming, onConfirm }: ChatMessageProps) {
+export default function ChatMessage({ message, isPendingTool, isStreaming, onConfirm, connectCardUri, pendingReauth, onCompleteReauth, reauthError }: ChatMessageProps) {
   if (message.role === "tool_call") {
     let toolCall: ToolCall;
     try {
@@ -19,13 +23,22 @@ export default function ChatMessage({ message, isPendingTool, isStreaming, onCon
       return null;
     }
 
+    const CardComponent = TOOL_CARD_MAP[toolCall.name];
+    if (!CardComponent) return null;
+
+    const baseProps = {
+      toolCall,
+      onConfirm,
+      disabled: isStreaming && !isPendingTool,
+    };
+
+    const props = toolCall.name === "open_reauth_dialog"
+      ? { ...baseProps, connectCardUri, pendingReauth, onCompleteReauth, reauthError }
+      : baseProps;
+
     return (
       <div className="px-4 py-1">
-        <ToolConfirmCard
-          toolCall={toolCall}
-          onConfirm={onConfirm}
-          disabled={isStreaming}
-        />
+        <CardComponent {...props} />
       </div>
     );
   }

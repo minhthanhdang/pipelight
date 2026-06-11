@@ -24,6 +24,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function AuditStatusBadge({ auditStatus, judgement }: { auditStatus: string; judgement?: string }) {
+  if (auditStatus === "none") return <span className="text-xs text-muted-foreground">—</span>;
   if (auditStatus === "done" && judgement) {
     switch (judgement) {
       case "clean":
