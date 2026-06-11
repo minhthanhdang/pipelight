@@ -1,38 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bot, Inbox } from "lucide-react";
-import type { ActionItem, ActionsResponse } from "@/lib/dashboard-types";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useDashboardActions } from "@/hooks/queries";
 
 export function AIActionsCard() {
-  const [actions, setActions] = useState<ActionItem[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useDashboardActions();
 
-  useEffect(() => {
-    fetchWithAuth("/api/dashboard/actions")
-      .then((r) => r.json())
-      .then((data: ActionsResponse) => {
-        setActions(data.actions);
-        setCursor(data.nextCursor);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const loadMore = useCallback(() => {
-    if (!cursor || loadingMore) return;
-    setLoadingMore(true);
-    fetchWithAuth(`/api/dashboard/actions?cursor=${cursor}`)
-      .then((r) => r.json())
-      .then((data: ActionsResponse) => {
-        setActions((prev) => [...prev, ...data.actions]);
-        setCursor(data.nextCursor);
-      })
-      .finally(() => setLoadingMore(false));
-  }, [cursor, loadingMore]);
+  const actions = data?.pages.flatMap((p) => p.actions) ?? [];
 
   return (
     <Card className="lg:col-span-6">
@@ -40,7 +15,7 @@ export function AIActionsCard() {
         <CardTitle>AI Actions</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex h-32 items-center justify-center text-muted-foreground">Loading…</div>
         ) : actions.length === 0 ? (
           <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
@@ -68,13 +43,13 @@ export function AIActionsCard() {
                 </li>
               ))}
             </ul>
-            {cursor && (
+            {hasNextPage && (
               <button
-                onClick={loadMore}
-                disabled={loadingMore}
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
                 className="w-full rounded-md border py-2 text-sm text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50"
               >
-                {loadingMore ? "Loading…" : "Load more"}
+                {isFetchingNextPage ? "Loading…" : "Load more"}
               </button>
             )}
           </div>

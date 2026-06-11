@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAIStore } from "@/stores/useAIStore";
@@ -20,9 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
-import type { ConnectorOption, SyncEventItem, SyncHistoryResponse } from "@/lib/dashboard-types";
+import type { ConnectorOption, SyncEventItem } from "@/lib/dashboard-types";
 import { AuditChart } from "@/components/sync-history/AuditChart";
+import { useSyncEvents, useTriggerSync, useTriggerAudit } from "@/hooks/queries";
 
 export default function ConnectorDetail({
   connector,
@@ -31,72 +30,23 @@ export default function ConnectorDetail({
 }) {
   const setChatOpen = useAIStore((s) => s.setChatOpen);
   const setPendingPrompt = useAIStore((s) => s.setPendingPrompt);
-  const queryClient = useQueryClient();
-
   const [selectedEvent, setSelectedEvent] = useState<SyncEventItem | null>(null);
-  const [allEvents, setAllEvents] = useState<SyncEventItem[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+  const [hasRunning, setHasRunning] = useState(false);
 
-  async function handleSync() {
-    setSyncing(true);
-    try {
-      await fetchWithAuth(`/api/connectors/${connector.fivetranId}/sync`, { method: "POST" });
-      queryClient.invalidateQueries({ queryKey: ["sync-events", connector.id] });
-    } finally {
-      setSyncing(false);
-    }
+  const eventsQuery = useSyncEvents(connector.id, hasRunning);
+  const syncMutation = useTriggerSync(connector.fivetranId, connector.id);
+  const auditMutation = useTriggerAudit(connector.id);
+
+  const allEvents = eventsQuery.data?.pages.flatMap((p) => p.events) ?? [];
+
+  const nextHasRunning = allEvents.some((e) => e.auditStatus === "running");
+  if (nextHasRunning !== hasRunning) {
+    setHasRunning(nextHasRunning);
   }
 
-  const hasRunning = allEvents.some((e) => e.auditStatus === "running");
-
-  const { isLoading } = useQuery({
-    queryKey: ["sync-events", connector.id],
-    queryFn: async () => {
-      const params = new URLSearchParams({ connectorId: connector.id });
-      const res = await fetchWithAuth(`/api/sync-history?${params}`);
-      const data = (await res.json()) as SyncHistoryResponse;
-      setAllEvents(data.events);
-      setNextCursor(data.nextCursor);
-      return data;
-    },
-    refetchInterval: hasRunning ? 5000 : false,
-  });
-
-  async function handleLoadMore() {
-    if (!nextCursor) return;
-    setLoadingMore(true);
-    const params = new URLSearchParams({ connectorId: connector.id, cursor: nextCursor });
-    const res = await fetchWithAuth(`/api/sync-history?${params}`);
-    const data = (await res.json()) as SyncHistoryResponse;
-    setAllEvents((prev) => [...prev, ...data.events]);
-    setNextCursor(data.nextCursor);
-    setLoadingMore(false);
-  }
-
-  async function handleAction(action: "audit" | "chat", event: SyncEventItem) {
+  function handleAction(action: "audit" | "chat", event: SyncEventItem) {
     if (action === "audit") {
-      setAllEvents((prev) =>
-        prev.map((e) =>
-          e.id === event.id
-            ? {
-                ...e,
-                auditStatus: "running",
-                audit: {
-                  id: "temp",
-                  judgement: "running",
-                  directCause: "",
-                  analysis: "",
-                  suggestions: [],
-                  createdAt: new Date().toISOString(),
-                },
-              }
-            : e,
-        ),
-      );
-      await fetchWithAuth(`/api/sync-history/${event.id}/audit`, { method: "POST" });
-      queryClient.invalidateQueries({ queryKey: ["sync-events", connector.id] });
+      auditMutation.mutate(event.id);
       return;
     }
 
@@ -126,13 +76,13 @@ export default function ConnectorDetail({
         <Card className="h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Sync Events</CardTitle>
-            <Button onClick={handleSync} disabled={syncing} size="sm" variant="outline">
-              <RefreshCw className={`mr-2 h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+            <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} size="sm" variant="outline">
+              <RefreshCw className={`mr-2 h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
               Sync from Fivetran
             </Button>
           </CardHeader>
           <CardContent className="flex-1 min-h-0 overflow-auto">
-            {isLoading ? (
+            {eventsQuery.isLoading ? (
               <div className="py-12 flex justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
@@ -158,14 +108,14 @@ export default function ConnectorDetail({
                     ))}
                   </TableBody>
                 </Table>
-                {nextCursor && (
+                {eventsQuery.hasNextPage && (
                   <div className="mt-4 flex justify-center">
                     <Button
                       variant="outline"
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
+                      onClick={() => eventsQuery.fetchNextPage()}
+                      disabled={eventsQuery.isFetchingNextPage}
                     >
-                      {loadingMore && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {eventsQuery.isFetchingNextPage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Load more
                     </Button>
                   </div>

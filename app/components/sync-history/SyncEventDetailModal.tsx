@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { ChevronDown, ChevronRight, LifeBuoy, Loader2 } from "lucide-react";
 import { useAIStore } from "@/stores/useAIStore";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
-import type { SyncEventItem, SyncAuditResult } from "@/lib/dashboard-types";
+import { useEventAudits } from "@/hooks/queries";
+import type { SyncEventItem } from "@/lib/dashboard-types";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -97,20 +97,9 @@ export default function SyncEventDetailModal({ event, open, onOpenChange }: Sync
   const setPendingPrompt = useAIStore((s) => s.setPendingPrompt);
   const setChatOpen = useAIStore((s) => s.setChatOpen);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [auditHistory, setAuditHistory] = useState<SyncAuditResult[]>([]);
 
-  async function loadHistory() {
-    if (!event) return;
-    if (historyOpen) { setHistoryOpen(false); return; }
-    setHistoryOpen(true);
-    setHistoryLoading(true);
-    try {
-      const res = await fetchWithAuth(`/api/sync-history/${event.id}/audits`);
-      setAuditHistory(await res.json());
-    } catch { setAuditHistory([]); }
-    setHistoryLoading(false);
-  }
+  const fetchAudits = historyOpen && !!event;
+  const { data: auditHistory = [], isLoading: historyLoading } = useEventAudits(fetchAudits ? event.id : null);
 
   if (!event) return null;
 
@@ -190,7 +179,7 @@ export default function SyncEventDetailModal({ event, open, onOpenChange }: Sync
             {(event.auditCount ?? 0) > 1 && (
               <div className="mt-3">
                 <button
-                  onClick={loadHistory}
+                  onClick={() => setHistoryOpen((v) => !v)}
                   className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                 >
                   {historyOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import type { SyncStatsResponse } from "@/lib/dashboard-types";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useDashboardSyncs } from "@/hooks/queries";
 
 const chartConfig = {
   rate: { label: "Success Rate", color: "var(--accent-green-bright)" },
@@ -19,16 +18,7 @@ const PERIODS = [
 
 export function SyncStateCard() {
   const [period, setPeriod] = useState("week");
-  const [data, setData] = useState<SyncStatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchWithAuth(`/api/dashboard/syncs?period=${period}`)
-      .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [period]);
+  const { data, isLoading } = useDashboardSyncs(period);
 
   const successRate = data && data.total > 0 ? Math.round((data.successes / data.total) * 100) : 0;
   const dailyRates = data?.daily.map((d) => {
@@ -54,7 +44,7 @@ export function SyncStateCard() {
         </CardAction>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex h-48 items-center justify-center text-muted-foreground">Loading…</div>
         ) : data ? (
           <div className="space-y-4">

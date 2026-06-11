@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ConnectorOption } from "@/lib/dashboard-types";
+import { LoadConnectorsCTA } from "@/components/LoadConnectorsCTA";
 
 type SortBy = "newest" | "name";
 type FilterStatus = "all" | "failed" | "paused" | "success";
@@ -28,8 +29,10 @@ function latestSync(c: ConnectorOption): number {
 
 export default function SyncHistoryClient({
   connectors,
+  hasKeys,
 }: {
   connectors: ConnectorOption[];
+  hasKeys: boolean;
 }) {
   const [sortBy, setSortBy] = useState<SortBy>("newest");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
@@ -46,6 +49,10 @@ export default function SyncHistoryClient({
       return nameA.localeCompare(nameB);
     });
   }, [connectors, sortBy, filterStatus]);
+
+  if (connectors.length === 0 && hasKeys) {
+    return <LoadConnectorsCTA />;
+  }
 
   return (
     <>

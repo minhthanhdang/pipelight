@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
-import type { AuditIssueItem } from "@/lib/dashboard-types";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useDashboardIssues } from "@/hooks/queries";
 
 function judgementBadge(judgement: string) {
   if (judgement === "failure")
@@ -13,15 +11,7 @@ function judgementBadge(judgement: string) {
 }
 
 export function AIIssuesCard() {
-  const [issues, setIssues] = useState<AuditIssueItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchWithAuth("/api/dashboard/issues")
-      .then((r) => r.json())
-      .then(setIssues)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: issues = [], isLoading } = useDashboardIssues();
 
   return (
     <Card className="lg:col-span-6">
@@ -29,7 +19,7 @@ export function AIIssuesCard() {
         <CardTitle>Audit Issues</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex h-32 items-center justify-center text-muted-foreground">Loading…</div>
         ) : issues.length === 0 ? (
           <div className="flex items-center gap-2 py-8 justify-center text-sm text-success">

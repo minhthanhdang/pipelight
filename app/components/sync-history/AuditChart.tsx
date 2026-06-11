@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { PieChart, Pie, Cell } from "recharts";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { CalendarIcon } from "lucide-react";
@@ -11,16 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ChartContainer, ChartTooltip, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
-import type { AuditDistribution, AuditDistributionResponse } from "@/lib/dashboard-types";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useAuditDistribution } from "@/hooks/queries";
 
 const chartConfig = {
   clean: { label: "Clean", color: "var(--chart-success)" },
   warning: { label: "Warning", color: "var(--chart-3)" },
   critical: { label: "Critical", color: "var(--chart-5)" },
 } satisfies ChartConfig;
-
-const COLORS = [chartConfig.clean.color, chartConfig.warning.color, chartConfig.critical.color];
 
 function buildMonthOptions() {
   const now = new Date();
@@ -71,40 +68,23 @@ export function AuditChart({ className, connectorId }: { className?: string; con
   const [mode, setMode] = useState<"month" | "custom">("month");
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
-  const [distribution, setDistribution] = useState<AuditDistribution | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const monthOptions = useMemo(buildMonthOptions, []);
 
-  const dateRange = useMemo(() => {
+  const queryParams = useMemo(() => {
     if (mode === "month") {
       const [y, m] = selectedMonth.split("-").map(Number);
       const base = new Date(y, m - 1, 1);
-      return { start: startOfMonth(base), end: endOfMonth(base) };
+      return { start: startOfMonth(base).toISOString(), end: endOfMonth(base).toISOString(), connectorId };
     }
     if (customRange?.from && customRange?.to) {
-      return { start: customRange.from, end: customRange.to };
+      return { start: customRange.from.toISOString(), end: customRange.to.toISOString(), connectorId };
     }
     return null;
-  }, [mode, selectedMonth, customRange]);
+  }, [mode, selectedMonth, customRange, connectorId]);
 
-  useEffect(() => {
-    if (!dateRange) {
-      setDistribution(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const params = new URLSearchParams({
-      start: dateRange.start.toISOString(),
-      end: dateRange.end.toISOString(),
-      ...(connectorId && { connectorId }),
-    });
-    fetchWithAuth(`/api/sync-history/audits?${params}`)
-      .then((r) => r.json())
-      .then((data: AuditDistributionResponse) => setDistribution(data.distribution))
-      .finally(() => setLoading(false));
-  }, [dateRange, connectorId]);
+  const { data, isLoading } = useAuditDistribution(queryParams);
+  const distribution = data?.distribution ?? null;
 
   const pieData = distribution
     ? [
@@ -147,9 +127,9 @@ export function AuditChart({ className, connectorId }: { className?: string; con
         </CardAction>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex h-48 items-center justify-center text-muted-foreground">Loading…</div>
-        ) : mode === "custom" && !dateRange ? (
+        ) : mode === "custom" && !queryParams ? (
           <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">Select start and end dates</div>
         ) : pieData.length > 0 ? (
           <ChartContainer config={chartConfig} className="mx-auto h-48 w-full">

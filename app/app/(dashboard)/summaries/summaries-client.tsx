@@ -1,66 +1,53 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ConnectorOption, SyncSummaryItem } from "@/lib/dashboard-types";
+import { LoadConnectorsCTA } from "@/components/LoadConnectorsCTA";
+import { useSummaries, useGenerateSummary } from "@/hooks/queries";
 
 type Period = "last_week" | "last_month";
 
 export default function SummariesClient({
   connectors,
+  hasKeys,
 }: {
   connectors: ConnectorOption[];
+  hasKeys: boolean;
 }) {
   const [connectorId, setConnectorId] = useState("");
   const [period, setPeriod] = useState<Period>("last_week");
-  const [summaries, setSummaries] = useState<SyncSummaryItem[]>([]);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const fetchSummaries = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (connectorId) params.set("connectorId", connectorId);
-    const res = await fetch(`/api/summaries?${params}`);
-    if (res.ok) {
-      const data = await res.json();
-      setSummaries(data.summaries);
-    }
-    setLoading(false);
-  }, [connectorId]);
+  const { data, isLoading } = useSummaries(connectorId || undefined);
+  const generateMutation = useGenerateSummary(connectorId || undefined);
 
-  useEffect(() => {
-    setLoading(true);
-    fetchSummaries();
-  }, [fetchSummaries]);
+  const summaries = data?.summaries ?? [];
 
   async function handleGenerate() {
-    setGenerating(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/summaries/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          connectorId: connectorId || undefined,
-          period,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? `Request failed (${res.status})`);
-        return;
-      }
-      setSummaries((prev) => [data, ...prev]);
-    } catch {
-      setError("Network error — check your connection and try again.");
-    } finally {
-      setGenerating(false);
-    }
+    await generateMutation.mutateAsync({
+      connectorId: connectorId || undefined,
+      period,
+    });
+  }
+
+  if (connectors.length === 0 && hasKeys) {
+    return (
+      <div className="p-6 space-y-6 h-full flex flex-col">
+        <div>
+          <h1 className="text-2xl font-medium text-muted-foreground">
+            AI Summaries
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Generate AI-powered summaries of your sync health
+          </p>
+        </div>
+        <LoadConnectorsCTA />
+      </div>
+    );
   }
 
   return (
@@ -97,8 +84,8 @@ export default function SummariesClient({
           <option value="last_month">Last 30 days</option>
         </select>
 
-        <Button size="sm" onClick={handleGenerate} disabled={generating}>
-          {generating ? (
+        <Button size="sm" onClick={handleGenerate} disabled={generateMutation.isPending}>
+          {generateMutation.isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Generating…
@@ -112,14 +99,14 @@ export default function SummariesClient({
         </Button>
       </div>
 
-      {error && (
+      {generateMutation.error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
+          {generateMutation.error.message}
         </div>
       )}
 
       <div className="flex-1 space-y-4 overflow-y-auto">
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>

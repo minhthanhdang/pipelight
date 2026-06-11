@@ -23,6 +23,15 @@ export default async function SummariesPage() {
     orderBy: { service: "asc" },
   });
 
+  let hasKeys = false;
+  if (connectors.length === 0) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { fivetranApiKey: true },
+    });
+    hasKeys = !!user?.fivetranApiKey;
+  }
+
   const enriched = connectors.map((c) => {
     const meta = getConnectorMeta(c.fivetranId);
     return {
@@ -39,5 +48,5 @@ export default async function SummariesPage() {
     };
   });
 
-  return <SummariesClient connectors={enriched} />;
+  return <SummariesClient connectors={enriched} hasKeys={hasKeys} />;
 }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useSyncAllConnectors } from "@/hooks/queries";
 import {
   Card,
   CardContent,
@@ -119,20 +119,15 @@ function SortButton({
 export default function ConnectorsClient({ connectors }: { connectors: ConnectorRow[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [refreshing, setRefreshing] = useState(false);
+  const syncMutation = useSyncAllConnectors();
   const [sortKey, setSortKey] = useState<SortKey>("label");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  const loading = refreshing || isPending;
+  const loading = syncMutation.isPending || isPending;
 
   async function handleRefresh() {
-    setRefreshing(true);
-    try {
-      await fetchWithAuth("/api/connectors/sync", { method: "POST" });
-      startTransition(() => router.refresh());
-    } finally {
-      setRefreshing(false);
-    }
+    await syncMutation.mutateAsync();
+    startTransition(() => router.refresh());
   }
 
   function toggleSort(key: SortKey) {

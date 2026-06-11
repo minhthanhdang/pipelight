@@ -7,13 +7,14 @@ import { SidebarProvider } from "@/components/sidebar/SidebarContext";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import ChatPanel from "@/components/chat/ChatPanel";
 import ChatToggleButton from "@/components/chat/ChatToggleButton";
-import { useFivetranKeys } from "@/hooks/useFivetranKeys";
+import { useFivetranSettings } from "@/hooks/queries";
 import { SparklesIcon } from "lucide-react";
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const chatOpen = useAIStore((s) => s.chatOpen);
   const setChatOpen = useAIStore((s) => s.setChatOpen);
-  const { hasKeys, loading } = useFivetranKeys();
+  const { data: settingsData, isLoading: loading } = useFivetranSettings();
+  const hasKeys = settingsData?.hasKeys ?? null;
   const pathname = usePathname();
 
   const isSettingsPage = pathname === "/settings";

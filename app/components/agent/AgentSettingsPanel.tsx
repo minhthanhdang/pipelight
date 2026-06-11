@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useAgentSettingsStore } from "@/stores/useAgentSettingsStore";
+import { useAgentConfig, useUpdateAgentConfig } from "@/hooks/queries";
 import {
   MODELS,
   MODEL_CAPABILITIES,
@@ -24,9 +25,31 @@ export function AgentSettingsPanel() {
   const store = useAgentSettingsStore();
   const caps = MODEL_CAPABILITIES[store.model as ModelId] ?? MODEL_CAPABILITIES["gemini-2.5-flash"];
 
+  const { data: serverConfig } = useAgentConfig();
+  const updateMutation = useUpdateAgentConfig();
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (!store.isLoaded) store.fetchConfig();
-  }, [store.isLoaded]);
+    if (serverConfig && !store.isLoaded) {
+      store.setFromServer(serverConfig);
+    }
+  }, [serverConfig, store.isLoaded]);
+
+  const debouncedSave = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const config = useAgentSettingsStore.getState().getConfig();
+      updateMutation.mutate(config);
+    }, 500);
+  }, [updateMutation]);
+
+  const handleUpdate = useCallback(
+    (partial: Parameters<typeof store.updateConfig>[0]) => {
+      store.updateConfig(partial);
+      debouncedSave();
+    },
+    [store, debouncedSave],
+  );
 
   return (
     <Card>
@@ -39,7 +62,7 @@ export function AgentSettingsPanel() {
           <Label>Model</Label>
           <Select
             value={store.model}
-            onValueChange={(v) => store.updateConfig({ model: v as ModelId })}
+            onValueChange={(v) => handleUpdate({ model: v as ModelId })}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -65,7 +88,7 @@ export function AgentSettingsPanel() {
             step={0.1}
             value={store.temperature ?? 1.0}
             disabled={!caps.temperature}
-            onChange={(e) => store.updateConfig({ temperature: parseFloat(e.target.value) })}
+            onChange={(e) => handleUpdate({ temperature: parseFloat(e.target.value) })}
             className="w-full accent-primary disabled:opacity-50"
           />
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -85,7 +108,7 @@ export function AgentSettingsPanel() {
             step={0.05}
             value={store.topP ?? 0.95}
             disabled={!caps.topP}
-            onChange={(e) => store.updateConfig({ topP: parseFloat(e.target.value) })}
+            onChange={(e) => handleUpdate({ topP: parseFloat(e.target.value) })}
             className="w-full accent-primary disabled:opacity-50"
           />
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -98,7 +121,7 @@ export function AgentSettingsPanel() {
           <Label className={!caps.thinkingLevel ? "text-muted-foreground" : ""}>Thinking Level</Label>
           <Select
             value={store.thinkingLevel ?? "MEDIUM"}
-            onValueChange={(v) => store.updateConfig({ thinkingLevel: v as ThinkingLevel })}
+            onValueChange={(v) => handleUpdate({ thinkingLevel: v as ThinkingLevel })}
             disabled={!caps.thinkingLevel}
           >
             <SelectTrigger className="w-full">
@@ -121,7 +144,7 @@ export function AgentSettingsPanel() {
           <textarea
             value={store.customInstruction ?? ""}
             disabled={!caps.customInstruction}
-            onChange={(e) => store.updateConfig({ customInstruction: e.target.value })}
+            onChange={(e) => handleUpdate({ customInstruction: e.target.value })}
             placeholder="Additional instructions appended to the agent's system prompt..."
             rows={4}
             className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"

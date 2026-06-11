@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
-import type { IncidentsResponse } from "@/lib/dashboard-types";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useDashboardIncidents } from "@/hooks/queries";
 
 const chartConfig = {
   syncFailures: { label: "Sync Failures", color: "var(--chart-5)" },
@@ -21,16 +20,7 @@ const PERIODS = [
 
 export function IncidentsCard() {
   const [period, setPeriod] = useState("week");
-  const [data, setData] = useState<IncidentsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchWithAuth(`/api/dashboard/incidents?period=${period}`)
-      .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [period]);
+  const { data, isLoading } = useDashboardIncidents(period);
 
   return (
     <Card className="lg:col-span-3">
@@ -50,7 +40,7 @@ export function IncidentsCard() {
         </CardAction>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex h-48 items-center justify-center text-muted-foreground">Loading…</div>
         ) : data && data.connectors.length > 0 ? (
           <ChartContainer config={chartConfig} className="h-64 w-full">

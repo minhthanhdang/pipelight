@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { AlertTriangle, AlertCircle, ShieldCheck, XCircle } from "lucide-react";
-import type { HealthResponse, HealthIncidentItem } from "@/lib/dashboard-types";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import type { HealthIncidentItem } from "@/lib/dashboard-types";
+import { useDashboardHealth } from "@/hooks/queries";
 
 const PERIODS = [
   { value: "week", label: "7 days" },
@@ -27,16 +27,7 @@ function incidentBadge(item: HealthIncidentItem) {
 
 export function PipelineHealthCard() {
   const [period, setPeriod] = useState("week");
-  const [data, setData] = useState<HealthResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchWithAuth(`/api/dashboard/health?period=${period}`)
-      .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [period]);
+  const { data, isLoading } = useDashboardHealth(period);
 
   return (
     <Card className="lg:col-span-4">
@@ -56,7 +47,7 @@ export function PipelineHealthCard() {
         </CardAction>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex h-32 items-center justify-center text-muted-foreground">Loading…</div>
         ) : data ? (
           <div className="space-y-4">

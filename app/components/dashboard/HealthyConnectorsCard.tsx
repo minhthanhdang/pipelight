@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { CheckCircle2, Inbox } from "lucide-react";
-import type { HealthyConnectorsResponse } from "@/lib/dashboard-types";
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { useDashboardHealthyConnectors } from "@/hooks/queries";
 
 const PERIODS = [
   { value: "week", label: "7 days" },
@@ -25,16 +24,7 @@ function relativeTime(iso: string) {
 
 export function HealthyConnectorsCard() {
   const [period, setPeriod] = useState("week");
-  const [data, setData] = useState<HealthyConnectorsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchWithAuth(`/api/dashboard/healthy-connectors?period=${period}`)
-      .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [period]);
+  const { data, isLoading } = useDashboardHealthyConnectors(period);
 
   return (
     <Card className="lg:col-span-2">
@@ -54,7 +44,7 @@ export function HealthyConnectorsCard() {
         </CardAction>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex h-48 items-center justify-center text-muted-foreground">Loading…</div>
         ) : data && data.connectors.length > 0 ? (
           <ul className="space-y-2">

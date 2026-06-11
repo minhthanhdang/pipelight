@@ -31,6 +31,15 @@ export default async function SyncHistoryPage() {
     orderBy: { succeededAt: "desc" },
   });
 
+  let hasKeys = false;
+  if (connectors.length === 0) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { fivetranApiKey: true },
+    });
+    hasKeys = !!user?.fivetranApiKey;
+  }
+
   const enriched = connectors.map((c) => {
     const meta = getConnectorMeta(c.fivetranId);
     return {
@@ -69,7 +78,7 @@ export default async function SyncHistoryPage() {
         </p>
       </div>
 
-      <SyncHistoryClient connectors={enriched} />
+      <SyncHistoryClient connectors={enriched} hasKeys={hasKeys} />
     </div>
   );
 }
