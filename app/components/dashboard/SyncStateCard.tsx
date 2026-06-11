@@ -9,6 +9,7 @@ import { useDashboardSyncs } from "@/hooks/queries";
 
 const chartConfig = {
   rate: { label: "Success Rate", color: "var(--accent-green-bright)" },
+  failures: { label: "Failures", color: "var(--destructive)" },
 } satisfies ChartConfig;
 
 const PERIODS = [
@@ -23,7 +24,7 @@ export function SyncStateCard() {
   const successRate = data && data.total > 0 ? Math.round((data.successes / data.total) * 100) : 0;
   const dailyRates = data?.daily.map((d) => {
     const total = d.success + d.failure;
-    return { date: d.date, rate: total > 0 ? Math.round((d.success / total) * 100) : 0 };
+    return { date: d.date, rate: total > 0 ? Math.round((d.success / total) * 100) : 0, failures: d.failure };
   }) ?? [];
 
   return (
@@ -67,26 +68,15 @@ export function SyncStateCard() {
                   </defs>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString(undefined, { month: "short", day: "numeric" })} tickLine={false} axisLine={false} />
-                  <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
-                  <ChartTooltip formatter={(value) => [`${value}%`, "Success Rate"]} />
-                  <Line type="monotone" dataKey="rate" stroke="var(--color-rate)" strokeWidth={2} dot={{ r: 3 }} filter="url(#glowLine)" />
+                  <YAxis yAxisId="rate" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="failures" orientation="right" tickLine={false} axisLine={false} allowDecimals={false} />
+                  <ChartTooltip formatter={(value, name) => name === "rate" ? [`${value}%`, "Success Rate"] : [value, "Failures"]} />
+                  <Line yAxisId="rate" type="monotone" dataKey="rate" stroke="var(--color-rate)" strokeWidth={2} dot={{ r: 3 }} filter="url(#glowLine)" />
+                  <Line yAxisId="failures" type="monotone" dataKey="failures" stroke="var(--color-failures)" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ChartContainer>
             ) : (
               <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">No sync data yet</div>
-            )}
-            {data.topFailures.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Top Failing Connectors</p>
-                <div className="space-y-1">
-                  {data.topFailures.map((f) => (
-                    <div key={f.fivetranId} className="flex items-center justify-between text-sm">
-                      <span className="font-mono text-xs">{f.service}</span>
-                      <span className="text-destructive font-medium">{f.failureCount} failures</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             )}
           </div>
         ) : null}

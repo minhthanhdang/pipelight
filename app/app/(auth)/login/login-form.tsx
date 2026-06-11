@@ -36,7 +36,7 @@ export default function LoginForm() {
   return (
     <>
       <h2 className="text-2xl font-bold mb-1">Log In</h2>
-      <p className="text-muted-foreground mb-6">Welcome back to SyncGuard</p>
+      <p className="text-muted-foreground mb-6">Welcome back to Pipelight</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

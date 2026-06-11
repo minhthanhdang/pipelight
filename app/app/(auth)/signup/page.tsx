@@ -34,7 +34,7 @@ export default function SignupPage() {
   return (
     <>
       <h2 className="text-2xl font-bold mb-1">Create an Account</h2>
-      <p className="text-muted-foreground mb-6">Get started with SyncGuard</p>
+      <p className="text-muted-foreground mb-6">Get started with Pipelight</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

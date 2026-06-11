@@ -24,18 +24,16 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     <SidebarProvider>
       <div className="relative mx-auto flex h-screen max-h-[1080px] w-full max-w-[1400px] flex-col overflow-x-clip px-16 pt-12">
         <div className="relative z-10 flex h-14 items-center shrink-0 pr-6">
-          <div className="flex items-center gap-2 pl-[42px]">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm shrink-0">
-              S
-            </div>
-            <span className="font-semibold text-base uppercase tracking-wide whitespace-nowrap">SyncGuard</span>
+          <div className="flex items-center gap-0 pl-[42px]">
+            <img src="/logo-256.png" alt="Pipelight" width={40} height={40} className="rounded-lg shrink-0" />
+            <img src="/logo-title.png" alt="Pipelight" height={108} className="h-[108px] w-auto" />
           </div>
           <button
             onClick={() => setChatOpen(true)}
             className="group relative ml-auto flex cursor-text items-center gap-2 text-sm text-[#B3B1B6]"
           >
             <span className="relative shimmer-text">Chat with your data</span>
-            <SparklesIcon className="relative size-4 text-[#4a4a4a] fill-[#4a4a4a]" />
+            <SparklesIcon className="relative size-4 text-blue-400 fill-none animate-sparkle-pulse" />
           </button>
           {/* <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-20 w-3/5 rounded-full bg-gradient-to-l from-blue-400/4 via-purple-400/2 to-transparent blur-3xl" />
           <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-20 w-2/5 rounded-full bg-gradient-to-l from-blue-400/20 via-purple-400/10 to-transparent blur-2xl" /> */}

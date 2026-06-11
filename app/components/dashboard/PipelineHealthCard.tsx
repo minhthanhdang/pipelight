@@ -25,7 +25,7 @@ export function PipelineHealthCard() {
   const { data, isLoading } = useDashboardHealth(period);
 
   return (
-    <Card className="lg:col-span-4">
+    <Card className="lg:col-span-4 min-h-[340px]">
       <CardHeader>
         <CardTitle>Data Health</CardTitle>
         <CardAction>
