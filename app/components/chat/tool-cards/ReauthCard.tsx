@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import type { ToolCall } from "@/hooks/useChat";
 import ToolCardBase from "./ToolCardBase";
@@ -22,6 +23,7 @@ export default function ReauthCard({
   onCompleteReauth,
   reauthError,
 }: ReauthCardProps) {
+  const [completing, setCompleting] = useState(false);
   const args = toolCall.args as Record<string, unknown> | undefined;
 
   const handleConfirm = (approved: boolean) => {
@@ -41,14 +43,16 @@ export default function ReauthCard({
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => onCompleteReauth?.(true)}
-              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              onClick={() => { setCompleting(true); onCompleteReauth?.(true); }}
+              disabled={completing}
+              className="rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
-              Done
+              {completing ? "Completing…" : "Done"}
             </button>
             <button
               onClick={() => onCompleteReauth?.(false)}
-              className="rounded-md border border-border bg-secondary px-4 py-1.5 text-xs font-medium text-secondary-foreground transition-colors hover:bg-accent"
+              disabled={completing}
+              className="rounded-md border border-border bg-secondary px-4 py-1.5 text-xs font-medium text-secondary-foreground transition-colors hover:bg-accent disabled:opacity-50"
             >
               Cancel
             </button>

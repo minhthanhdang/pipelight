@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useChat } from "@/hooks/useChat";
+import { useChat, hasNewChatFlag } from "@/hooks/useChat";
 import { useAIStore } from "@/stores/useAIStore";
 import ChatHeader from "./ChatHeader";
 import ChatMessageList from "./ChatMessageList";
@@ -42,11 +42,15 @@ export default function ChatPanel({ open, onClose }: ChatPanelProps) {
     prevOpenRef.current = open;
     if (!open) return;
     fetchSessions().then((list) => {
-      if (justOpened && list.length > 0 && !pendingPrompt) {
+      if (!justOpened || pendingPrompt) return;
+      if (hasNewChatFlag()) {
+        startNewSession();
+        setShowHistory(false);
+      } else if (list.length > 0) {
         switchSession(list[0].id);
       }
     });
-  }, [open, fetchSessions, switchSession, pendingPrompt]);
+  }, [open, fetchSessions, switchSession, startNewSession, pendingPrompt]);
 
   useEffect(() => {
     if (open && pendingPrompt && handledPromptRef.current !== pendingPrompt) {

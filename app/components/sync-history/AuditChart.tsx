@@ -64,12 +64,12 @@ function RangeDatePicker({
   );
 }
 
-export function AuditChart({ className, connectorId }: { className?: string; connectorId?: string }) {
+export function useAuditDateFilter(connectorId?: string) {
   const [mode, setMode] = useState<"all" | "month" | "custom">("all");
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
 
-  const monthOptions = useMemo(buildMonthOptions, []);
+  const monthOptions = useMemo(() => buildMonthOptions(), []);
 
   const queryParams = useMemo(() => {
     if (mode === "all") {
@@ -85,6 +85,12 @@ export function AuditChart({ className, connectorId }: { className?: string; con
     }
     return null;
   }, [mode, selectedMonth, customRange, connectorId]);
+
+  return { mode, setMode, selectedMonth, setSelectedMonth, customRange, setCustomRange, monthOptions, queryParams };
+}
+
+export function AuditChart({ className, filter }: { className?: string; filter: ReturnType<typeof useAuditDateFilter> }) {
+  const { mode, setMode, selectedMonth, setSelectedMonth, customRange, setCustomRange, monthOptions, queryParams } = filter;
 
   const { data, isLoading } = useAuditDistribution(queryParams);
   const distribution = data?.distribution ?? null;

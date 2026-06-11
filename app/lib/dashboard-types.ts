@@ -94,6 +94,15 @@ export interface AuditDistributionResponse {
   distribution: AuditDistribution;
 }
 
+export interface FalsePositiveStats {
+  totalSuccess: number;
+  warning: number;
+  critical: number;
+}
+export interface FalsePositiveResponse {
+  falsePositives: FalsePositiveStats;
+}
+
 export interface AuditSuggestion {
   action: string;
   toolName: string;

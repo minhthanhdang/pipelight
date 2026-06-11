@@ -20,7 +20,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { ConnectorOption, SyncEventItem } from "@/lib/dashboard-types";
-import { AuditChart } from "@/components/sync-history/AuditChart";
+import { AuditChart, useAuditDateFilter } from "@/components/sync-history/AuditChart";
+import { FalsePositiveCard } from "@/components/sync-history/FalsePositiveCard";
 import { useSyncEvents, useTriggerSync, useTriggerAudit } from "@/hooks/queries";
 
 export default function ConnectorDetail({
@@ -33,6 +34,7 @@ export default function ConnectorDetail({
   const [selectedEvent, setSelectedEvent] = useState<SyncEventItem | null>(null);
   const [hasRunning, setHasRunning] = useState(false);
 
+  const auditFilter = useAuditDateFilter(connector.id);
   const eventsQuery = useSyncEvents(connector.id, hasRunning);
   const syncMutation = useTriggerSync(connector.fivetranId, connector.id);
   const auditMutation = useTriggerAudit(connector.id);
@@ -60,16 +62,9 @@ export default function ConnectorDetail({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[600px] flex-1">
       <div className="flex flex-col gap-6 min-h-0">
         <div>
-          <AuditChart connectorId={connector.id} />
+          <AuditChart filter={auditFilter} />
         </div>
-        <Card className="flex-1 min-h-0">
-          <CardHeader>
-            <CardTitle>Alerts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Coming soon</p>
-          </CardContent>
-        </Card>
+        <FalsePositiveCard className="flex-1 min-h-0" queryParams={auditFilter.queryParams} />
       </div>
 
       <div className="lg:col-span-2 min-h-0">

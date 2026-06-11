@@ -144,7 +144,7 @@ export const POST = withAuth(async (session, req: Request) => {
         {
           functionResponse: {
             id: toolCallId,
-            name: toolCallId,
+            name: toolName,
             response: toolResult,
           },
         },

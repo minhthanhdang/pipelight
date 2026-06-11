@@ -30,7 +30,9 @@ function AuditStatusBadge({ auditStatus, judgement }: { auditStatus: string; jud
       case "clean":
         return <Badge className="bg-success/15 text-success hover:bg-success/15">Clean</Badge>;
       case "failure":
-        return <Badge variant="destructive">Failure</Badge>;
+        return <Badge variant="destructive">Critical</Badge>;
+      case "warning":
+        return <Badge className="bg-warning/15 text-warning hover:bg-warning/15">Warning</Badge>;
       case "drift":
         return <Badge className="bg-warning/15 text-warning hover:bg-warning/15">Drift</Badge>;
       default:

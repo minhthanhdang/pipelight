@@ -2,6 +2,13 @@ import { withAuth } from "@/lib/auth-middleware";
 import { prisma } from "@/lib/prisma";
 import { createAdkSession, runSSEWithRetry, APP_NAME } from "@/lib/adk";
 import { DEFAULT_AGENT_CONFIG, type AgentConfig } from "@/lib/agent-config";
+import { WRITE_TOOLS } from "@/lib/write-tools";
+
+type TappedToolCall = {
+  id?: string;
+  name: string;
+  args: Record<string, unknown>;
+};
 
 async function getUserAgentConfig(userId: string): Promise<AgentConfig> {
   const config = await prisma.agentConfig.findUnique({ where: { userId } });
@@ -97,17 +104,20 @@ export const POST = withAuth(async (session, req: Request) => {
     async start(controller) {
       const decoder = new TextDecoder();
       let agentText = "";
-      const toolCalls: string[] = [];
+      let buffer = "";
+      const toolCalls: TappedToolCall[] = [];
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
           controller.enqueue(value);
 
-          const lines = chunk.split("\n");
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             const raw = line.slice(6).trim();
@@ -121,7 +131,26 @@ export const POST = withAuth(async (session, req: Request) => {
                   if (part.text) agentText += part.text;
                   if (part.functionCall) {
                     console.log(`[chat] tool call: ${part.functionCall.name}`, JSON.stringify(part.functionCall.args ?? {}).slice(0, 200));
-                    toolCalls.push(JSON.stringify(part.functionCall));
+                    toolCalls.push({
+                      id: part.functionCall.id,
+                      name: part.functionCall.name,
+                      args: part.functionCall.args ?? {},
+                    });
+                  }
+                  if (part.functionResponse) {
+                    const fr = part.functionResponse;
+                    const match = toolCalls.find((tc) =>
+                      fr.id ? tc.id === fr.id : tc.name === fr.name,
+                    );
+                    if (
+                      match &&
+                      WRITE_TOOLS.includes(match.name) &&
+                      fr.response &&
+                      typeof fr.response === "object" &&
+                      !Array.isArray(fr.response)
+                    ) {
+                      match.args = { ...match.args, ...fr.response };
+                    }
                   }
                 }
               }
@@ -138,7 +167,7 @@ export const POST = withAuth(async (session, req: Request) => {
         }
         for (const tc of toolCalls) {
           await prisma.chatMessage.create({
-            data: { sessionId: chatSessionId, role: "tool_call", content: tc },
+            data: { sessionId: chatSessionId, role: "tool_call", content: JSON.stringify(tc) },
           });
         }
 

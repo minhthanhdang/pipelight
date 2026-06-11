@@ -1,7 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchJson, fetchWithAuth, ApiError } from "@/lib/fetchWithAuth";
 import { queryKeys } from "./queryKeys";
-import type { AuditDistributionResponse, SyncAuditResult, SyncHistoryResponse } from "@/lib/dashboard-types";
+import type { AuditDistributionResponse, FalsePositiveResponse, SyncAuditResult, SyncHistoryResponse } from "@/lib/dashboard-types";
 
 export function useAuditDistribution(params: { start?: string; end?: string; connectorId?: string } | null) {
   return useQuery({
@@ -12,6 +12,19 @@ export function useAuditDistribution(params: { start?: string; end?: string; con
       if (params!.end) sp.set("end", params!.end);
       if (params!.connectorId) sp.set("connectorId", params!.connectorId);
       return fetchJson<AuditDistributionResponse>(`/api/sync-history/audits?${sp}`);
+    },
+    enabled: !!params,
+  });
+}
+
+export function useFalsePositiveStats(params: { connectorId: string; start?: string; end?: string } | null) {
+  return useQuery({
+    queryKey: params ? queryKeys.syncHistory.falsePositives(params.connectorId, params.start ?? "all", params.end ?? "all") : ["false-positives-disabled"],
+    queryFn: () => {
+      const sp = new URLSearchParams({ connectorId: params!.connectorId });
+      if (params!.start) sp.set("start", params!.start);
+      if (params!.end) sp.set("end", params!.end);
+      return fetchJson<FalsePositiveResponse>(`/api/sync-history/false-positives?${sp}`);
     },
     enabled: !!params,
   });

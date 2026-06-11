@@ -6,7 +6,6 @@ import Link from "next/link";
 import { SidebarProvider } from "@/components/sidebar/SidebarContext";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import ChatPanel from "@/components/chat/ChatPanel";
-import ChatToggleButton from "@/components/chat/ChatToggleButton";
 import { useFivetranSettings } from "@/hooks/queries";
 import { SparklesIcon } from "lucide-react";
 
@@ -30,7 +29,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </div>
           <button
             onClick={() => setChatOpen(true)}
-            className="group relative ml-auto flex cursor-text items-center gap-2 text-sm text-[#B3B1B6]"
+            className="group relative ml-auto flex cursor-pointer items-center gap-2 text-sm text-[#B3B1B6]"
           >
             <span className="relative shimmer-text">Chat with your data</span>
             <SparklesIcon className="relative size-4 text-blue-400 fill-none animate-sparkle-pulse" />
@@ -63,7 +62,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </div>
         </main>
         <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
-        <ChatToggleButton visible={!chatOpen} />
         </div>
       </div>
     </SidebarProvider>

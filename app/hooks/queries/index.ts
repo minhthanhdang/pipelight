@@ -14,6 +14,7 @@ export {
 } from "./useSettingsQueries";
 export {
   useAuditDistribution,
+  useFalsePositiveStats,
   useEventAudits,
   useSyncEvents,
   useTriggerSync,

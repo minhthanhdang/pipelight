@@ -4,6 +4,15 @@ import { useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { useAIStore } from "@/stores/useAIStore";
+import { WRITE_TOOLS } from "@/lib/write-tools";
+
+const NEW_CHAT_FLAG = "chat:prefer-new-session";
+export const hasNewChatFlag = () =>
+  typeof window !== "undefined" && localStorage.getItem(NEW_CHAT_FLAG) === "1";
+const setNewChatFlag = (on: boolean) =>
+  on
+    ? localStorage.setItem(NEW_CHAT_FLAG, "1")
+    : localStorage.removeItem(NEW_CHAT_FLAG);
 
 export type ChatMessage = {
   id: string;
@@ -24,6 +33,7 @@ export type ChatSessionSummary = {
   updatedAt: string;
   preview: string;
 };
+
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -51,6 +61,7 @@ export function useChat() {
       const decoder = new TextDecoder();
       let buffer = "";
       let agentMsgId: string | null = null;
+      let pendingTc: ToolCall | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -114,42 +125,27 @@ export function useChat() {
                 }
               }
 
-              if (part.functionCall) {
+              if (part.functionCall && !pendingTc) {
                 const name = part.functionCall.name;
-                const WRITE_TOOLS = [
-                  "modify_connector",
-                  "modify_schema_config",
-                  "trigger_sync",
-                  "resync_connector",
-                  "open_reauth_dialog",
-                ];
                 if (WRITE_TOOLS.includes(name)) {
-                  const tc: ToolCall = {
+                  pendingTc = {
                     name,
                     id: part.functionCall.id ?? name,
                     args: part.functionCall.args ?? {},
                   };
-                  const toolMsg: ChatMessage = {
-                    id: nextId(),
-                    role: "tool_call",
-                    content: JSON.stringify(tc),
-                  };
-                  setMessages((prev) => [...prev, toolMsg]);
-                  setPendingToolCall(tc);
+                }
+              }
 
-                  if (name === "open_reauth_dialog" && tc.args.connector_id) {
-                    fetchWithAuth("/api/connectors/connect-card", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ connectorId: tc.args.connector_id }),
-                    })
-                      .then((r) => r.json())
-                      .then((d) => { if (d.connectCardUri) setConnectCardUri(d.connectCardUri); })
-                      .catch(() => {});
+              if (part.functionResponse && pendingTc) {
+                const fr = part.functionResponse;
+                if (fr.id === pendingTc.id || fr.name === pendingTc.name) {
+                  const resp = fr.response;
+                  if (resp && typeof resp === "object" && !Array.isArray(resp)) {
+                    pendingTc.args = {
+                      ...pendingTc.args,
+                      ...(resp as Record<string, unknown>),
+                    };
                   }
-
-                  reader.cancel();
-                  return;
                 }
               }
             }
@@ -158,12 +154,33 @@ export function useChat() {
           }
         }
       }
+
+      if (pendingTc) {
+        const tc = pendingTc;
+        setMessages((prev) => [
+          ...prev,
+          { id: nextId(), role: "tool_call", content: JSON.stringify(tc) },
+        ]);
+        setPendingToolCall(tc);
+
+        if (tc.name === "open_reauth_dialog" && tc.args.connector_id) {
+          fetchWithAuth("/api/connectors/connect-card", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ connectorId: tc.args.connector_id }),
+          })
+            .then((r) => r.json())
+            .then((d) => { if (d.connectCardUri) setConnectCardUri(d.connectCardUri); })
+            .catch(() => {});
+        }
+      }
     },
     [sessionId],
   );
 
   const sendMessage = useCallback(
     async (text: string) => {
+      setNewChatFlag(false);
       const userMsg: ChatMessage = {
         id: nextId(),
         role: "user",
@@ -316,12 +333,14 @@ export function useChat() {
 
   const switchSession = useCallback(
     async (sid: string) => {
+      setNewChatFlag(false);
       await loadHistory(sid);
     },
     [loadHistory],
   );
 
   const startNewSession = useCallback(() => {
+    setNewChatFlag(true);
     setMessages([]);
     setSessionId(null);
     setPendingToolCall(null);
