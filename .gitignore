@@ -101,3 +101,5 @@ venv/
 # Data
 *.zip
 data/
+
+.mcp.json
